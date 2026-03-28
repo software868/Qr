@@ -3,6 +3,8 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { RegisterForm } from "@/app/register/register-form";
 
+export const dynamic = "force-dynamic";
+
 export default async function RegisterPage() {
   const adminCount = await prisma.user.count({ where: { role: UserRole.ADMIN } });
   if (adminCount > 0) {
