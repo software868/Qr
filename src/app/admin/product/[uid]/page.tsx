@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { getProductDetailAction } from "@/actions/admin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,8 +23,11 @@ export default async function AdminProductPage({ params }: { params: Promise<{ u
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/admin">← Back</Link>
+        <Button variant="outline" size="sm" asChild className="gap-1.5">
+          <Link href="/admin">
+            <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+            Back to dashboard
+          </Link>
         </Button>
         <Badge variant={product.status === "QC_COMPLETE" ? "default" : "secondary"}>{product.status}</Badge>
       </div>
@@ -64,7 +68,7 @@ export default async function AdminProductPage({ params }: { params: Promise<{ u
                   : "QC has not been completed — BOM appears after QC selects a product type."}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-auto">
               {bom?.lines?.length ? (
                 <Table>
                   <TableHeader>

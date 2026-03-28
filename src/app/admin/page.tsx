@@ -6,7 +6,8 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <p className="max-w-2xl text-muted-foreground">
-          Search by product UID, serial number, or name. Open a product for BOM, QC data, and uploaded images.
+          Filter by UID, serial, or name. Switch between table and card views. Open a row or card for full details,
+          BOM, QC data, and images.
         </p>
         <ExportCsvButton />
       </div>
