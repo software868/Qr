@@ -37,23 +37,23 @@ export async function createProductAction(formData: FormData) {
   }
 
   const d = parsed.data;
-  const { product, qrDataUrl } = await createProductWithUid({
+  const result = await createProductWithUid({
     ...d,
     createdById: session.user.id,
   });
 
-  await logAudit(session.user.id, "PRODUCT_CREATE", "Product", product.id, { productUid: product.productUid });
+  await logAudit(session.user.id, "PRODUCT_CREATE", "Product", result.product.id, { productUid: result.product.productUid });
 
   return {
     ok: true as const,
-    productUid: product.productUid,
-    qrDataUrl,
+    productUid: result.product.productUid,
+    qrDataUrl: result.qrDataUrl,
     product: {
-      name: product.name,
-      make: product.make,
-      model: product.model,
-      serialNumber: product.serialNumber,
-      quantity: product.quantity,
+      name: d.name,
+      make: d.make,
+      model: d.model,
+      serialNumber: d.serialNumber,
+      quantity: d.quantity,
     },
   };
 }
