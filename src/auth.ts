@@ -10,11 +10,45 @@ const credentialsSchema = z.object({
   password: z.string().min(1).max(128),
 });
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ||
+  process.env.VERCEL === "1";
+
+const cookiePrefix = useSecureCookies ? "__Secure-" : "";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   trustHost: true,
   pages: {
     signIn: "/login",
+  },
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}authjs.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    callbackUrl: {
+      name: `${cookiePrefix}authjs.callback-url`,
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    csrfToken: {
+      name: useSecureCookies ? "__Host-authjs.csrf-token" : "authjs.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
   },
   providers: [
     Credentials({
@@ -24,24 +58,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(raw) {
-        console.log("[AUTH] authorize called with email:", (raw as Record<string, unknown>)?.email);
         const parsed = credentialsSchema.safeParse(raw);
-        if (!parsed.success) {
-          console.log("[AUTH] validation failed:", parsed.error.flatten());
-          return null;
-        }
+        if (!parsed.success) return null;
         const { email, password } = parsed.data;
         const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-        if (!user) {
-          console.log("[AUTH] user not found for email:", email.toLowerCase());
-          return null;
-        }
+        if (!user) return null;
         const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) {
-          console.log("[AUTH] password mismatch for:", email);
-          return null;
-        }
-        console.log("[AUTH] login success for:", email, "role:", user.role);
+        if (!ok) return null;
+        console.log("[AUTH] login success:", email, "role:", user.role);
         return {
           id: user.id,
           email: user.email,
@@ -56,7 +80,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id!;
         token.role = user.role as UserRole;
-        console.log("[AUTH] jwt callback - setting token id:", user.id, "role:", user.role);
       }
       return token;
     },
@@ -65,7 +88,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
       }
-      console.log("[AUTH] session callback - role:", token.role, "id:", token.id);
       return session;
     },
   },

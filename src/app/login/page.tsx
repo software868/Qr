@@ -3,15 +3,13 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "";
   const nextParam = searchParams.get("next") ?? "";
@@ -36,10 +34,11 @@ function LoginForm() {
       });
 
       if (!res || res.error) {
-        const msg = res?.error === "CredentialsSignin"
-          ? "Invalid email or password."
-          : `Login failed: ${res?.error ?? "No response"}`;
-        setErrorMsg(msg);
+        setErrorMsg(
+          res?.error === "CredentialsSignin"
+            ? "Invalid email or password."
+            : `Login failed: ${res?.error ?? "No response"}`
+        );
         setPending(false);
         return;
       }
@@ -50,33 +49,16 @@ function LoginForm() {
         return;
       }
 
-      // Fetch session to get user role for redirect
-      let roleDest = "/admin";
-      try {
-        const sessionRes = await fetch("/api/auth/session");
-        const sessionText = await sessionRes.text();
-        alert(`[DEBUG] Session response: ${sessionText}`);
-        const session = JSON.parse(sessionText);
-        const role = session?.user?.role;
-        if (role === "QR_USER") roleDest = "/qr";
-        else if (role === "QC_USER") roleDest = "/qc";
-        else if (role === "ADMIN") roleDest = "/admin";
-      } catch (sessionErr) {
-        alert(`[DEBUG] Session fetch error: ${sessionErr}`);
-      }
-
       const dest =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
           ? nextParam
           : callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/login"
             ? callbackUrl
-            : roleDest;
+            : "/";
 
-      alert(`[DEBUG] Redirecting to: ${dest}`);
       window.location.href = dest;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMsg(msg);
+      setErrorMsg(err instanceof Error ? err.message : String(err));
       setPending(false);
     }
   }

@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/auth";
 import type { UserRole } from "@prisma/client";
 import { canAccessPath, defaultPathForRole } from "@/lib/auth/permissions";
 
-const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
-
-export async function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
 
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|webp)$/)
+    /\.(ico|png|jpg|jpeg|svg|webp)$/.test(pathname)
   ) {
     return NextResponse.next();
   }
+
+  const session = request.auth;
+  const role = session?.user?.role as UserRole | undefined;
+
+  console.log("[MIDDLEWARE]", pathname, "| role:", role ?? "none", "| session:", session ? "yes" : "no");
 
   const isPublic =
     pathname === "/login" ||
@@ -27,46 +30,35 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/p/") ||
     pathname.startsWith("/f/");
 
-  const token = await getToken({
-    req: request,
-    secret: authSecret,
-  });
-
-  console.log("[MIDDLEWARE]", pathname, "| token:", token ? `id=${token.id} role=${token.role}` : "null", "| secret-length:", authSecret?.length ?? 0);
-
-  if (pathname === "/" && token?.role) {
-    const role = token.role as UserRole;
+  if (pathname === "/" && role) {
     return NextResponse.redirect(new URL(defaultPathForRole(role), request.url));
   }
 
   if (isPublic) {
     if (
-      token &&
+      session &&
       (pathname === "/login" ||
         pathname === "/register" ||
         pathname.startsWith("/register/"))
     ) {
-      const role = token.role as UserRole | undefined;
-      const dest =
-        role === "ADMIN" ? "/admin" : role === "QR_USER" ? "/qr" : role === "QC_USER" ? "/qc" : "/admin";
+      const dest = role ? defaultPathForRole(role) : "/admin";
       return NextResponse.redirect(new URL(dest, request.url));
     }
     return NextResponse.next();
   }
 
-  if (!token) {
+  if (!session) {
     const login = new URL("/login", request.url);
     login.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(login);
   }
 
-  const role = token.role as UserRole | undefined;
   if (!canAccessPath(role, pathname)) {
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image).*)"],
