@@ -54,13 +54,15 @@ function LoginForm() {
       let roleDest = "/admin";
       try {
         const sessionRes = await fetch("/api/auth/session");
-        const session = await sessionRes.json();
+        const sessionText = await sessionRes.text();
+        alert(`[DEBUG] Session response: ${sessionText}`);
+        const session = JSON.parse(sessionText);
         const role = session?.user?.role;
         if (role === "QR_USER") roleDest = "/qr";
         else if (role === "QC_USER") roleDest = "/qc";
         else if (role === "ADMIN") roleDest = "/admin";
-      } catch {
-        // fallback to /admin
+      } catch (sessionErr) {
+        alert(`[DEBUG] Session fetch error: ${sessionErr}`);
       }
 
       const dest =
@@ -70,6 +72,7 @@ function LoginForm() {
             ? callbackUrl
             : roleDest;
 
+      alert(`[DEBUG] Redirecting to: ${dest}`);
       window.location.href = dest;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
