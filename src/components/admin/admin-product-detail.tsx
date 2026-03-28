@@ -158,8 +158,8 @@ export function AdminProductDetail({ data }: { data: AdminProductDetailPayload }
                   <div>
                     <p className="text-muted-foreground">Scanned item UIDs</p>
                     <ul className="mt-1 list-inside list-disc font-mono text-xs">
-                      {scanned.map((u) => (
-                        <li key={u}>{u}</li>
+                      {scanned.map((u, i) => (
+                        <li key={`${i}-${u}`}>{u}</li>
                       ))}
                     </ul>
                   </div>

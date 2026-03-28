@@ -70,10 +70,13 @@ export async function getProductDetailAction(uid: string) {
     return { ok: false as const, error: "Unauthorized" };
   }
 
+  // MongoDB `id` is ObjectId; PRD-… UIDs are not valid hex — never pass them as `id` or Prisma throws.
+  const where = /^[a-f\d]{24}$/i.test(uid)
+    ? { OR: [{ productUid: uid }, { id: uid }] as const }
+    : { productUid: uid };
+
   const product = await prisma.product.findFirst({
-    where: {
-      OR: [{ productUid: uid }, { id: uid }],
-    },
+    where,
     include: {
       createdBy: { select: { name: true, email: true } },
       qcRecord: {

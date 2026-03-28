@@ -5,6 +5,12 @@ import {
   type AdminProductDetailPayload,
 } from "@/components/admin/admin-product-detail";
 
+function safeToIso(d: Date): string {
+  const t = d.getTime();
+  if (Number.isNaN(t)) return new Date(0).toISOString();
+  return d.toISOString();
+}
+
 export default async function AdminProductPage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = await params;
   const res = await getProductDetailAction(decodeURIComponent(uid));
@@ -28,8 +34,8 @@ export default async function AdminProductPage({ params }: { params: Promise<{ u
     serialNumber: product.serialNumber,
     quantity: product.quantity,
     status: product.status,
-    createdAtIso: product.createdAt.toISOString(),
-    dateIso: product.date.toISOString(),
+    createdAtIso: safeToIso(product.createdAt),
+    dateIso: safeToIso(product.date),
     createdBy: product.createdBy,
     qcRecord: qc
       ? {
@@ -44,7 +50,7 @@ export default async function AdminProductPage({ params }: { params: Promise<{ u
       : null,
     bom: bom
       ? {
-          lines: bom.lines.map((line) => ({
+          lines: (bom.lines ?? []).map((line) => ({
             id: line.id,
             partCode: line.partCode,
             description: line.description,
