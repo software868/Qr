@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { getToken } from "next-auth/jwt";
 import type { UserRole } from "@prisma/client";
 import { canAccessPath, defaultPathForRole } from "@/lib/auth/permissions";
 
-export default auth((request) => {
+const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
+const useSecureCookies =
+  process.env.NEXTAUTH_URL?.startsWith("https://") === true ||
+  process.env.VERCEL === "1";
+
+const sessionCookieName = useSecureCookies
+  ? "__Secure-authjs.session-token"
+  : "authjs.session-token";
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
@@ -16,10 +26,15 @@ export default auth((request) => {
     return NextResponse.next();
   }
 
-  const session = request.auth;
-  const role = session?.user?.role as UserRole | undefined;
+  const token = await getToken({
+    req: request,
+    secret,
+    secureCookie: useSecureCookies,
+    cookieName: sessionCookieName,
+    salt: sessionCookieName,
+  });
 
-  console.log("[MIDDLEWARE]", pathname, "| role:", role ?? "none", "| session:", session ? "yes" : "no");
+  const role = token?.role as UserRole | undefined;
 
   const isPublic =
     pathname === "/login" ||
@@ -36,7 +51,7 @@ export default auth((request) => {
 
   if (isPublic) {
     if (
-      session &&
+      token &&
       (pathname === "/login" ||
         pathname === "/register" ||
         pathname.startsWith("/register/"))
@@ -47,7 +62,7 @@ export default auth((request) => {
     return NextResponse.next();
   }
 
-  if (!session) {
+  if (!token) {
     const login = new URL("/login", request.url);
     login.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(login);
@@ -58,7 +73,7 @@ export default auth((request) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image).*)"],
