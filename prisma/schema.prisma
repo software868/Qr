@@ -1,0 +1,124 @@
+// Product Tracking & QC — MongoDB + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  QR_USER
+  QC_USER
+}
+
+enum ProductStatus {
+  CREATED
+  QC_COMPLETE
+}
+
+enum ProductType {
+  CONTROL_PANEL
+  IPS
+  AVS
+}
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  productsCreated Product[] @relation("ProductCreator")
+  qcRecords       QcRecord[]
+}
+
+model Product {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  productUid    String        @unique
+  name          String
+  make          String
+  model         String
+  serialNumber  String
+  quantity      Int
+  date          DateTime
+  status        ProductStatus @default(CREATED)
+  createdById   String        @db.ObjectId
+  createdBy     User          @relation("ProductCreator", fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  qcRecord QcRecord?
+
+  @@index([createdById])
+}
+
+model BomTemplate {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  productType ProductType      @unique
+  name        String
+  lines       BomTemplateLine[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model BomTemplateLine {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  templateId  String      @db.ObjectId
+  template    BomTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  sortOrder   Int
+  partCode    String
+  description String
+  expectedQty Int         @default(1)
+
+  @@index([templateId])
+}
+
+model QcRecord {
+  id               String      @id @default(auto()) @map("_id") @db.ObjectId
+  productId        String      @unique @db.ObjectId
+  product          Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productType      ProductType
+  scannedItemUids  String[]
+  formData         Json
+  finalProductUid  String      @unique
+  performedById    String      @db.ObjectId
+  performedBy      User        @relation(fields: [performedById], references: [id])
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  images QcImage[]
+
+  @@index([performedById])
+}
+
+model QcImage {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  qcRecordId  String   @db.ObjectId
+  qcRecord    QcRecord @relation(fields: [qcRecordId], references: [id], onDelete: Cascade)
+  url         String
+  publicId    String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([qcRecordId])
+}
+
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String?  @db.ObjectId
+  action     String
+  entity     String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+}
