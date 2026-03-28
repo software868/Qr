@@ -13,6 +13,13 @@ const productSelect = {
   serialNumber: true,
   status: true,
   createdAt: true,
+  qcRecord: {
+    select: {
+      performedBy: {
+        select: { name: true, email: true },
+      },
+    },
+  },
 } as const;
 
 export async function getAllProductsAction() {

@@ -18,6 +18,9 @@ type ProductRow = {
   serialNumber: string;
   status: string;
   createdAt: Date;
+  qcRecord: {
+    performedBy: { name: string; email: string };
+  } | null;
 };
 
 export function AdminSearch() {
@@ -93,11 +96,18 @@ export function AdminSearch() {
                   </div>
                   <CardDescription className="line-clamp-2">{p.name}</CardDescription>
                 </CardHeader>
-                <CardContent className="text-xs text-muted-foreground">
+                <CardContent className="space-y-1 text-xs text-muted-foreground">
                   <p>
                     {p.make} · {p.model}
                   </p>
                   <p className="font-mono">SN: {p.serialNumber}</p>
+                  {p.status === "QC_COMPLETE" && p.qcRecord?.performedBy && (
+                    <p className="pt-1 text-foreground">
+                      <span className="text-muted-foreground">QC by </span>
+                      <span className="font-medium">{p.qcRecord.performedBy.name}</span>
+                      <span className="text-muted-foreground"> ({p.qcRecord.performedBy.email})</span>
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </Link>
