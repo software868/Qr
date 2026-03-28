@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { isMongoObjectIdString } from "@/lib/mongo";
 import { getBomForType } from "@/services/qc.service";
 
 const productSelect = {
@@ -70,29 +71,39 @@ export async function getProductDetailAction(uid: string) {
     return { ok: false as const, error: "Unauthorized" };
   }
 
-  // MongoDB `id` is ObjectId; PRD-… UIDs are not valid hex — never pass them as `id` or Prisma throws.
-  const where = /^[a-f\d]{24}$/i.test(uid)
+  const where = isMongoObjectIdString(uid)
     ? { OR: [{ productUid: uid }, { id: uid }] as const }
     : { productUid: uid };
 
-  const product = await prisma.product.findFirst({
-    where,
-    include: {
-      createdBy: { select: { name: true, email: true } },
-      qcRecord: {
-        include: {
-          images: { orderBy: { sortOrder: "asc" } },
-          performedBy: { select: { name: true, email: true } },
+  let product;
+  try {
+    product = await prisma.product.findFirst({
+      where,
+      include: {
+        createdBy: { select: { name: true, email: true } },
+        qcRecord: {
+          include: {
+            images: { orderBy: { sortOrder: "asc" } },
+            performedBy: { select: { name: true, email: true } },
+          },
         },
       },
-    },
-  });
+    });
+  } catch (e) {
+    console.error("[getProductDetailAction] prisma findFirst failed:", e);
+    return { ok: false as const, error: "Lookup failed" };
+  }
 
   if (!product) {
     return { ok: false as const, error: "Not found" };
   }
 
-  const bom = product.qcRecord ? await getBomForType(product.qcRecord.productType) : null;
+  let bom = null;
+  try {
+    bom = product.qcRecord ? await getBomForType(product.qcRecord.productType) : null;
+  } catch (e) {
+    console.error("[getProductDetailAction] getBomForType failed:", e);
+  }
 
   return { ok: true as const, product, bom };
 }

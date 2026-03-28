@@ -41,11 +41,13 @@ export default async function AdminProductPage({ params }: { params: Promise<{ u
       ? {
           finalProductUid: qc.finalProductUid,
           productType: qc.productType,
-          createdAtIso: qc.createdAt.toISOString(),
+          createdAtIso: safeToIso(qc.createdAt),
           scannedItemUids: Array.isArray(qc.scannedItemUids) ? qc.scannedItemUids : [],
           formData,
-          performedBy: qc.performedBy,
-          images: qc.images.map((img) => ({ id: img.id, url: img.url })),
+          performedBy: qc.performedBy
+            ? { name: qc.performedBy.name, email: qc.performedBy.email }
+            : { name: "Unknown", email: "—" },
+          images: (qc.images ?? []).map((img) => ({ id: img.id, url: img.url })),
         }
       : null,
     bom: bom

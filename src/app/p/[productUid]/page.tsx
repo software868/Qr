@@ -10,6 +10,10 @@ export default async function PublicProductPage({ params }: { params: Promise<{ 
   });
   if (!product) notFound();
 
+  const dateLabel = Number.isNaN(product.date.getTime())
+    ? "—"
+    : product.date.toLocaleDateString();
+
   return (
     <div className="container mx-auto max-w-lg py-12 px-4">
       <Card>
@@ -25,7 +29,7 @@ export default async function PublicProductPage({ params }: { params: Promise<{ 
           <Row label="Make / Model" value={`${product.make} ${product.model}`} />
           <Row label="Serial" value={product.serialNumber} />
           <Row label="Quantity" value={String(product.quantity)} />
-          <Row label="Date" value={product.date.toLocaleDateString()} />
+          <Row label="Date" value={dateLabel} />
         </CardContent>
       </Card>
     </div>

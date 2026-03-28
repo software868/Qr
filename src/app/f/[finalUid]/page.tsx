@@ -35,9 +35,9 @@ export default async function PublicFinalProductPage({ params }: { params: Promi
             <p className="text-muted-foreground">QC type</p>
             <p>{qc.productType.replaceAll("_", " ")}</p>
           </div>
-          {qc.images.length > 0 && (
+          {(qc.images?.length ?? 0) > 0 && (
             <div className="grid grid-cols-2 gap-2">
-              {qc.images.map((img) => (
+              {(qc.images ?? []).map((img) => (
                 <a key={img.id} href={img.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="" className="h-32 w-full object-cover" />
