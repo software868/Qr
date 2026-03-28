@@ -29,17 +29,20 @@ function LoginForm() {
     const password = String(fd.get("password") ?? "");
 
     try {
+      alert(`[DEBUG] Attempting sign in with email: ${email}`);
+
       const res = await signIn("credentials", {
         email,
         password,
         redirect: false,
       });
 
-      console.log("[Login] signIn response:", JSON.stringify(res));
+      alert(`[DEBUG] signIn response: ${JSON.stringify(res)}`);
 
       if (!res) {
-        setErrorMsg("No response from server. Please try again.");
-        toast.error("No response from server.");
+        const msg = "No response from server. Please try again.";
+        alert(`[DEBUG] ${msg}`);
+        setErrorMsg(msg);
         setPending(false);
         return;
       }
@@ -48,20 +51,21 @@ function LoginForm() {
         const msg = res.error === "CredentialsSignin"
           ? "Invalid email or password."
           : `Login failed: ${res.error}`;
+        alert(`[DEBUG] Error: ${res.error} | URL: ${res.url} | Status: ${res.status}`);
         setErrorMsg(msg);
-        toast.error(msg);
         setPending(false);
         return;
       }
 
       if (!res.ok) {
-        setErrorMsg(`Login failed with status ${res.status}.`);
-        toast.error(`Login failed (status ${res.status}).`);
+        const msg = `Login failed with status ${res.status}.`;
+        alert(`[DEBUG] Not OK - status: ${res.status}, url: ${res.url}`);
+        setErrorMsg(msg);
         setPending(false);
         return;
       }
 
-      toast.success("Signed in!");
+      alert("[DEBUG] Login success! Redirecting...");
 
       const dest =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
@@ -73,10 +77,9 @@ function LoginForm() {
       router.push(dest);
       router.refresh();
     } catch (err) {
-      console.error("[Login] exception:", err);
-      const msg = err instanceof Error ? err.message : "Unexpected error";
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`[DEBUG] Exception: ${msg}`);
       setErrorMsg(msg);
-      toast.error(msg);
       setPending(false);
     }
   }
