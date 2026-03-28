@@ -72,7 +72,7 @@ export async function getProductDetailAction(uid: string) {
   }
 
   const where = isMongoObjectIdString(uid)
-    ? { OR: [{ productUid: uid }, { id: uid }] as const }
+    ? { OR: [{ productUid: uid }, { id: uid }] }
     : { productUid: uid };
 
   let product;
