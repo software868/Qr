@@ -28,7 +28,18 @@ export async function createProductWithUid(data: {
   quantity: number;
   date: Date;
   createdById: string;
-}): Promise<{ product: { id: string; productUid: string }; qrDataUrl: string }> {
+}): Promise<{
+  product: {
+    id: string;
+    productUid: string;
+    name: string;
+    make: string;
+    model: string;
+    serialNumber: string;
+    quantity: number;
+  };
+  qrDataUrl: string;
+}> {
   let productUid = generateProductUid();
   for (let i = 0; i < 5; i++) {
     const exists = await prisma.product.findUnique({ where: { productUid } });
