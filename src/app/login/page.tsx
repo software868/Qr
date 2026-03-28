@@ -50,12 +50,25 @@ function LoginForm() {
         return;
       }
 
+      // Fetch session to get user role for redirect
+      let roleDest = "/admin";
+      try {
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
+        const role = session?.user?.role;
+        if (role === "QR_USER") roleDest = "/qr";
+        else if (role === "QC_USER") roleDest = "/qc";
+        else if (role === "ADMIN") roleDest = "/admin";
+      } catch {
+        // fallback to /admin
+      }
+
       const dest =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
           ? nextParam
           : callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/login"
             ? callbackUrl
-            : "/";
+            : roleDest;
 
       window.location.href = dest;
     } catch (err) {
