@@ -32,6 +32,8 @@ export async function middleware(request: NextRequest) {
     secret: authSecret,
   });
 
+  console.log("[MIDDLEWARE]", pathname, "| token:", token ? `id=${token.id} role=${token.role}` : "null", "| secret-length:", authSecret?.length ?? 0);
+
   if (pathname === "/" && token?.role) {
     const role = token.role as UserRole;
     return NextResponse.redirect(new URL(defaultPathForRole(role), request.url));
