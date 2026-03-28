@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { getSession, signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -9,49 +9,76 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { defaultPathForRole } from "@/lib/auth/permissions";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "";
   const nextParam = searchParams.get("next") ?? "";
+  const registered = searchParams.get("registered");
   const [pending, setPending] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
+    setErrorMsg(null);
+
     const fd = new FormData(e.currentTarget);
-    const email = String(fd.get("email") ?? "");
+    const email = String(fd.get("email") ?? "").trim();
     const password = String(fd.get("password") ?? "");
 
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    setPending(false);
+      console.log("[Login] signIn response:", JSON.stringify(res));
 
-    if (res?.error) {
-      toast.error("Invalid email or password.");
-      return;
+      if (!res) {
+        setErrorMsg("No response from server. Please try again.");
+        toast.error("No response from server.");
+        setPending(false);
+        return;
+      }
+
+      if (res.error) {
+        const msg = res.error === "CredentialsSignin"
+          ? "Invalid email or password."
+          : `Login failed: ${res.error}`;
+        setErrorMsg(msg);
+        toast.error(msg);
+        setPending(false);
+        return;
+      }
+
+      if (!res.ok) {
+        setErrorMsg(`Login failed with status ${res.status}.`);
+        toast.error(`Login failed (status ${res.status}).`);
+        setPending(false);
+        return;
+      }
+
+      toast.success("Signed in!");
+
+      const dest =
+        nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+          ? nextParam
+          : callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/login"
+            ? callbackUrl
+            : "/";
+
+      router.push(dest);
+      router.refresh();
+    } catch (err) {
+      console.error("[Login] exception:", err);
+      const msg = err instanceof Error ? err.message : "Unexpected error";
+      setErrorMsg(msg);
+      toast.error(msg);
+      setPending(false);
     }
-
-    router.refresh();
-    const session = await getSession();
-    const role = session?.user?.role;
-    const safeNext =
-      nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "";
-    const dest =
-      callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/login"
-        ? callbackUrl
-        : safeNext
-          ? safeNext
-          : role
-            ? defaultPathForRole(role)
-            : "/admin";
-    router.push(dest);
   }
 
   return (
@@ -61,6 +88,11 @@ function LoginForm() {
         <CardDescription>Use your work email and password.</CardDescription>
       </CardHeader>
       <CardContent>
+        {registered && (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+            Account created successfully! Please sign in.
+          </div>
+        )}
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -70,6 +102,9 @@ function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Input id="password" name="password" type="password" autoComplete="current-password" required />
           </div>
+          {errorMsg && (
+            <p className="text-sm text-destructive">{errorMsg}</p>
+          )}
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Signing in…" : "Sign in"}
           </Button>
