@@ -9,8 +9,16 @@ export default async function QcLayout({ children }: { children: React.ReactNode
     redirect("/unauthorized");
   }
 
+  const nav =
+    session.user.role === "ADMIN"
+      ? [
+          { href: "/admin", label: "Admin dashboard" },
+          { href: "/qc", label: "Run QC" },
+        ]
+      : [{ href: "/qc", label: "Run QC" }];
+
   return (
-    <DashboardShell title="Quality check" nav={[{ href: "/qc", label: "Run QC" }]}>
+    <DashboardShell title="Quality check" nav={nav}>
       {children}
     </DashboardShell>
   );

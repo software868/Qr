@@ -49,12 +49,27 @@ function LoginForm() {
         return;
       }
 
-      const dest =
+      const explicit =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
           ? nextParam
           : callbackUrl && callbackUrl.startsWith("/") && callbackUrl !== "/login"
             ? callbackUrl
-            : "/";
+            : null;
+
+      let dest = explicit;
+      if (!dest) {
+        try {
+          const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
+          const session = await sessionRes.json();
+          const role = session?.user?.role as string | undefined;
+          if (role === "ADMIN") dest = "/admin";
+          else if (role === "QR_USER") dest = "/qr";
+          else if (role === "QC_USER") dest = "/qc";
+          else dest = "/";
+        } catch {
+          dest = "/";
+        }
+      }
 
       window.location.href = dest;
     } catch (err) {

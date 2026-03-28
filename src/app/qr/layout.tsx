@@ -9,8 +9,16 @@ export default async function QrLayout({ children }: { children: React.ReactNode
     redirect("/unauthorized");
   }
 
+  const nav =
+    session.user.role === "ADMIN"
+      ? [
+          { href: "/admin", label: "Admin dashboard" },
+          { href: "/qr", label: "New product" },
+        ]
+      : [{ href: "/qr", label: "New product" }];
+
   return (
-    <DashboardShell title="QR Generator" nav={[{ href: "/qr", label: "New product" }]}>
+    <DashboardShell title="QR Generator" nav={nav}>
       {children}
     </DashboardShell>
   );
