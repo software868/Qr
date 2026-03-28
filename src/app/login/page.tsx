@@ -29,43 +29,26 @@ function LoginForm() {
     const password = String(fd.get("password") ?? "");
 
     try {
-      alert(`[DEBUG] Attempting sign in with email: ${email}`);
-
       const res = await signIn("credentials", {
         email,
         password,
         redirect: false,
       });
 
-      alert(`[DEBUG] signIn response: ${JSON.stringify(res)}`);
-
-      if (!res) {
-        const msg = "No response from server. Please try again.";
-        alert(`[DEBUG] ${msg}`);
-        setErrorMsg(msg);
-        setPending(false);
-        return;
-      }
-
-      if (res.error) {
-        const msg = res.error === "CredentialsSignin"
+      if (!res || res.error) {
+        const msg = res?.error === "CredentialsSignin"
           ? "Invalid email or password."
-          : `Login failed: ${res.error}`;
-        alert(`[DEBUG] Error: ${res.error} | URL: ${res.url} | Status: ${res.status}`);
+          : `Login failed: ${res?.error ?? "No response"}`;
         setErrorMsg(msg);
         setPending(false);
         return;
       }
 
       if (!res.ok) {
-        const msg = `Login failed with status ${res.status}.`;
-        alert(`[DEBUG] Not OK - status: ${res.status}, url: ${res.url}`);
-        setErrorMsg(msg);
+        setErrorMsg(`Login failed (status ${res.status}).`);
         setPending(false);
         return;
       }
-
-      alert("[DEBUG] Login success! Redirecting...");
 
       const dest =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
@@ -74,11 +57,9 @@ function LoginForm() {
             ? callbackUrl
             : "/";
 
-      router.push(dest);
-      router.refresh();
+      window.location.href = dest;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      alert(`[DEBUG] Exception: ${msg}`);
       setErrorMsg(msg);
       setPending(false);
     }
