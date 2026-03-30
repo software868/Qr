@@ -10,10 +10,12 @@ export function DashboardShell({
   title,
   nav,
   children,
+  sidebarExtra,
 }: {
   title: string;
   nav: NavItem[];
   children: ReactNode;
+  sidebarExtra?: ReactNode;
 }) {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -36,6 +38,7 @@ export function DashboardShell({
             </Link>
           ))}
         </nav>
+        {sidebarExtra ? <div className="px-2 pb-3 md:px-3">{sidebarExtra}</div> : null}
       </aside>
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 md:h-16 md:px-6">

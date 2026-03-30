@@ -31,7 +31,16 @@ export async function completeQc(input: {
     include: { qcRecord: true },
   });
   if (!product) throw new Error("Product not found");
-  if (product.qcRecord) throw new Error("QC already completed for this product");
+
+  const existingQc = product.qcRecord;
+  const alreadyScannedCount = existingQc?.scannedItemUids?.length ?? 0;
+  const remainingQuantity = Math.max(0, product.quantity - alreadyScannedCount);
+  if (remainingQuantity <= 0) {
+    throw new Error("No remaining quantity to QC for this product");
+  }
+  if (input.scannedItemUids.length > remainingQuantity) {
+    throw new Error(`You can QC up to ${remainingQuantity} more item(s) for this product`);
+  }
 
   let finalUid = generateFinalProductUid();
   for (let i = 0; i < 5; i++) {
@@ -45,18 +54,37 @@ export async function completeQc(input: {
     uploaded.push(await uploadQcImageBuffer(img.buffer, img.mimeType));
   }
 
-  const record = await prisma.qcRecord.create({
-    data: {
-      productId: input.productId,
-      productType: input.productType,
-      scannedItemUids: input.scannedItemUids,
-      formData: input.formData,
-      finalProductUid: finalUid,
-      performedById: input.performedById,
-    },
-  });
+  const newScannedItemUids = [
+    ...(existingQc?.scannedItemUids ?? []),
+    ...input.scannedItemUids,
+  ];
 
-  let order = 0;
+  const record = existingQc
+    ? await prisma.qcRecord.update({
+        where: { id: existingQc.id },
+        data: {
+          // Append new items for incremental QC.
+          scannedItemUids: newScannedItemUids,
+          formData: input.formData,
+          finalProductUid: finalUid,
+          performedById: input.performedById,
+          productType: input.productType,
+        },
+      })
+    : await prisma.qcRecord.create({
+        data: {
+          productId: input.productId,
+          productType: input.productType,
+          scannedItemUids: input.scannedItemUids,
+          formData: input.formData,
+          finalProductUid: finalUid,
+          performedById: input.performedById,
+        },
+      });
+
+  // Append new uploaded images to existing record.
+  const existingImageCount = await prisma.qcImage.count({ where: { qcRecordId: record.id } });
+  let order = existingImageCount;
   for (const u of uploaded) {
     await prisma.qcImage.create({
       data: {
@@ -68,9 +96,12 @@ export async function completeQc(input: {
     });
   }
 
+  const newAlreadyScannedCount = newScannedItemUids.length;
+  const newRemaining = Math.max(0, product.quantity - newAlreadyScannedCount);
+
   await prisma.product.update({
     where: { id: input.productId },
-    data: { status: "QC_COMPLETE" },
+    data: { status: newRemaining === 0 ? "QC_COMPLETE" : "CREATED" },
   });
 
   const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";

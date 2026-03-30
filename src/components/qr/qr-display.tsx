@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { buildQrLabelsPrintableHtmlGrid, type QrPageSize } from "@/lib/qr-print-grid";
 
 type Props = {
   productUid: string;
@@ -27,53 +29,47 @@ export function QrDisplay({
   quantity,
 }: Props) {
   const [copies, setCopies] = useState(1);
+  const [pageSize, setPageSize] = useState<QrPageSize>("A4");
 
-  function download() {
-    const a = document.createElement("a");
-    a.href = qrDataUrl;
-    a.download = `${productUid}-qr.png`;
-    a.click();
-  }
+  const total = Math.max(1, Math.min(copies, 100));
+  const printableHtml = useMemo(() => {
+    return buildQrLabelsPrintableHtmlGrid({
+      qrDataUrl,
+      total,
+      pageSize,
+      title: `QR Labels — ${productUid}`,
+    });
+  }, [qrDataUrl, total, pageSize, productUid]);
 
-  function printLabels() {
-    const total = Math.max(1, Math.min(copies, 100));
+  function printLabelsFormatted() {
     const w = window.open("", "_blank");
     if (!w) return;
 
-    const labels = Array.from({ length: total }, (_, i) => {
-      const num = `${i + 1} / ${total}`;
-      return `
-        <div style="page-break-inside:avoid;page-break-after:always;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;font-family:system-ui,sans-serif;">
-          <img src="${qrDataUrl}" alt="QR" width="120" height="120" style="image-rendering:pixelated;" />
-          <table style="margin-top:16px;font-size:13px;border-collapse:collapse;text-align:left;">
-            <tr><td style="padding:2px 12px 2px 0;color:#666;">UID</td><td style="font-weight:600;font-family:monospace;">${productUid}</td></tr>
-            <tr><td style="padding:2px 12px 2px 0;color:#666;">Name</td><td>${name}</td></tr>
-            <tr><td style="padding:2px 12px 2px 0;color:#666;">Make / Model</td><td>${make} ${model}</td></tr>
-            <tr><td style="padding:2px 12px 2px 0;color:#666;">Serial</td><td>${serialNumber}</td></tr>
-            <tr><td style="padding:2px 12px 2px 0;color:#666;">Quantity</td><td>${quantity}</td></tr>
-          </table>
-          <p style="margin-top:12px;font-size:16px;font-weight:700;letter-spacing:1px;">${num}</p>
-        </div>`;
-    }).join("");
-
-    w.document.write(`
-      <html>
-        <head><title>Print QR — ${productUid}</title>
-          <style>@page{margin:10mm}@media print{body{margin:0}div:last-child{page-break-after:auto}}</style>
-        </head>
-        <body style="margin:0;">${labels}</body>
-      </html>`);
+    w.document.write(printableHtml);
     w.document.close();
     w.onload = () => {
-      w.print();
-      w.close();
+      window.setTimeout(() => {
+        w.focus();
+        w.print();
+        w.close();
+      }, 700);
     };
+  }
+
+  function downloadFormattedHtml() {
+    const blob = new Blob([printableHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${productUid}-labels-${pageSize}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-mono text-lg">{productUid}</CardTitle>
+        <CardTitle className="font-mono text-sm">{productUid}</CardTitle>
         <CardDescription>Download or print QR labels for the physical units.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -112,17 +108,30 @@ export function QrDisplay({
               onChange={(e) => setCopies(Math.max(1, Number(e.target.value) || 1))}
             />
           </div>
+          <div className="w-32">
+            <Label>Page size</Label>
+            <Select value={pageSize} onValueChange={(v) => setPageSize(v as QrPageSize)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Page size" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="A4">A4</SelectItem>
+                <SelectItem value="A3">A3</SelectItem>
+                <SelectItem value="A5">A5</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <p className="text-xs text-muted-foreground sm:pb-1.5">
-            Each label shows <strong>1/{copies}</strong>, <strong>2/{copies}</strong>, … <strong>{copies}/{copies}</strong>
+            Each label shows <strong>1/{total}</strong>, <strong>2/{total}</strong>, … <strong>{total}/{total}</strong>
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={printLabels}>
-            Print {copies > 1 ? `${copies} labels` : "label"}
+          <Button type="button" onClick={printLabelsFormatted}>
+            Print formatted ({pageSize})
           </Button>
-          <Button type="button" variant="secondary" onClick={download}>
-            Download PNG
+          <Button type="button" variant="secondary" onClick={downloadFormattedHtml}>
+            Download printable HTML
           </Button>
         </div>
       </CardContent>

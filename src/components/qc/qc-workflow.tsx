@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ProductType } from "@prisma/client";
 import { toast } from "sonner";
-import { getBomTemplateAction, lookupProductForQcAction, submitQcFormAction } from "@/actions/qc";
+import {
+  createQcProductAction,
+  deleteQcProductAction,
+  getBomTemplateAction,
+  submitQcFormAction,
+} from "@/actions/qc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +38,12 @@ export function QcWorkflow() {
   const [bom, setBom] = useState<{
     lines: { id: string; partCode: string; description: string; expectedQty: number }[];
   } | null>(null);
-  const [lookup, setLookup] = useState("");
+
+  // Section 2: scan items (N slots)
+  const [scanCountInput, setScanCountInput] = useState("");
+  const [scanCount, setScanCount] = useState<number | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [combinedUid, setCombinedUid] = useState<string | null>(null);
   const [product, setProduct] = useState<{
     id: string;
     productUid: string;
@@ -44,8 +54,10 @@ export function QcWorkflow() {
     quantity: number;
     date: string;
   } | null>(null);
-  const [items, setItems] = useState<string[]>([""]);
-  const [passStatus, setPassStatus] = useState<"pass" | "fail" | "conditional">("pass");
+
+  // Section 3: dynamic QC form (checkboxes from BOM + notes)
+  const [qcFields, setQcFields] = useState<{ key: string; type: "checkbox" | "textarea"; label: string }[]>([]);
+  const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -61,51 +73,90 @@ export function QcWorkflow() {
     });
   }, [productType]);
 
-  const loadProduct = useCallback(() => {
+  const scanned = useMemo(() => slots.map((s) => s.trim()).filter(Boolean), [slots]);
+  const allScanned =
+    scanCount !== null && scanCount > 0 && scanned.length === scanCount && scanned.every(Boolean);
+
+  async function buildCombinedUid(values: string[]) {
+    const payload = values.join("|");
+    const buf = new TextEncoder().encode(payload);
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    const bytes = Array.from(new Uint8Array(digest));
+    const hex = bytes.map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    return `CMB-${hex.slice(0, 12)}`;
+  }
+
+  const loadAfterScan = useCallback(() => {
+    if (!allScanned) return;
     startTransition(async () => {
-      const res = await lookupProductForQcAction({ productUid: lookup.trim() });
-      if (!res.ok) {
-        toast.error("error" in res ? res.error : "Lookup failed");
-        setProduct(null);
+      const uid = await buildCombinedUid(scanned);
+      setCombinedUid(uid);
+
+      const created = await createQcProductAction({
+        productType,
+        scannedItemUids: scanned,
+        combinedUid: uid,
+      });
+      if (!created.ok) {
+        toast.error("error" in created ? created.error : "Failed");
         return;
       }
-      if ("product" in res) setProduct(res.product);
-    });
-  }, [lookup]);
+      setProduct(created.product);
 
-  function addItemRow() {
-    setItems((prev) => [...prev, ""]);
-  }
-
-  function setItem(i: number, v: string) {
-    setItems((prev) => {
-      const next = [...prev];
-      next[i] = v;
-      return next;
+      const res = await fetch(`/api/qc-form?productType=${encodeURIComponent(String(productType))}`);
+      const json: unknown = await res.json();
+      if (typeof json === "object" && json !== null && (json as { ok?: unknown }).ok === true) {
+        const maybeFields = (json as { fields?: unknown }).fields;
+        const fields = Array.isArray(maybeFields)
+          ? (maybeFields as { key: string; type: "checkbox" | "textarea"; label: string }[])
+          : [];
+        setQcFields(fields);
+        const nextChecks: Record<string, boolean> = {};
+        for (const f of fields) if (f.type === "checkbox") nextChecks[f.key] = false;
+        setChecks(nextChecks);
+      } else {
+        setQcFields([]);
+        setChecks({});
+      }
     });
-  }
+  }, [allScanned, scanned, productType, startTransition]);
+
+  const computedResult = useMemo(() => {
+    const checkboxKeys = qcFields.filter((f) => f.type === "checkbox").map((f) => f.key);
+    if (checkboxKeys.length === 0) return "pass" as const;
+    return checkboxKeys.every((k) => checks[k] === true) ? ("pass" as const) : ("fail" as const);
+  }, [qcFields, checks]);
+
+  const rescan = useCallback(() => {
+    startTransition(async () => {
+      if (product) await deleteQcProductAction({ productId: product.id });
+      setProduct(null);
+      setCombinedUid(null);
+      setQcFields([]);
+      setChecks({});
+      setNotes("");
+      setFiles([]);
+      setPreviews([]);
+      setFinalQr(null);
+      setScanCountInput("");
+      setScanCount(null);
+      setSlots([]);
+    });
+  }, [product, startTransition]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!product) {
-      toast.error("Load a product first.");
-      return;
-    }
-    const scanned = items.map((s) => s.trim()).filter(Boolean);
-    if (scanned.length < 1) {
-      toast.error("Add at least one item UID.");
-      return;
-    }
+    if (!product) return toast.error("Scan items and click Load first.");
+    if (computedResult === "fail") return toast.error("QC result is Fail. Please rescan the item(s).");
 
     const fd = new FormData();
     fd.set("productId", product.id);
     fd.set("productType", productType);
     fd.set("scannedItemUids", JSON.stringify(scanned));
-    fd.set("passStatus", passStatus);
+    fd.set("passStatus", computedResult);
     fd.set("inspectorNotes", notes);
-    for (const f of files) {
-      fd.append("images", f);
-    }
+    fd.set("bomChecks", JSON.stringify(checks));
+    for (const f of files) fd.append("images", f);
 
     startTransition(async () => {
       const res = await submitQcFormAction(fd);
@@ -168,43 +219,93 @@ export function QcWorkflow() {
 
       <Card>
         <CardHeader>
-          <CardTitle>2. Product</CardTitle>
-          <CardDescription>Enter or scan the Product UID from the manufacturing QR label.</CardDescription>
+          <CardTitle>2. Product (Scan Items)</CardTitle>
+          <CardDescription>Scan the required number of item QR codes, then load.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="lookup">Product UID</Label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="scanCount">How many items do you want to scan?</Label>
               <Input
-                id="lookup"
-                value={lookup}
-                onChange={(e) => setLookup(e.target.value)}
-                placeholder="PRD-…"
-                className="font-mono"
-              />
-            </div>
-            <div className="flex gap-2">
-              <QrScannerButton
-                onScan={(text) => {
-                  setLookup(text.trim());
-                  toast.message("Scanned", { description: text });
+                id="scanCount"
+                type="number"
+                min={1}
+                max={50}
+                value={scanCountInput}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setScanCountInput(raw);
+
+                  const parsed = Number(raw);
+                  if (!Number.isFinite(parsed) || parsed <= 0) {
+                    setScanCount(null);
+                    setSlots([]);
+                    setCombinedUid(null);
+                    setProduct(null);
+                    setQcFields([]);
+                    setChecks({});
+                    setFinalQr(null);
+                    return;
+                  }
+
+                  const n = Math.max(1, Math.min(Math.trunc(parsed), 50));
+                  setScanCount(n);
+                  setSlots(Array.from({ length: n }, () => ""));
+                  setCombinedUid(null);
+                  setProduct(null);
+                  setQcFields([]);
+                  setChecks({});
+                  setFinalQr(null);
                 }}
               />
-              <Button type="button" onClick={loadProduct} disabled={pending}>
-                Load
-              </Button>
             </div>
+
+            {scanCount !== null && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Scan slots</Label>
+                <div className="space-y-2">
+                  {Array.from({ length: scanCount }, (_, i) => (
+                    <div key={i} className="flex gap-2">
+                      <Input
+                        value={slots[i] ?? ""}
+                        readOnly
+                        className="font-mono"
+                        placeholder={`Scan item ${i + 1}`}
+                      />
+                      <QrScannerButton
+                        onScan={(text) => {
+                          const v = text.trim();
+                          if (!v) return;
+                          setSlots((prev) => {
+                            if (prev.includes(v)) {
+                              toast.error("Duplicate scan detected.");
+                              return prev;
+                            }
+                            const next = [...prev];
+                            next[i] = v;
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {allScanned && (
+                  <Button type="button" onClick={loadAfterScan} disabled={pending}>
+                    Load
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
-          {product && (
-            <div className="rounded-lg border p-4 text-sm">
+
+          {combinedUid && (
+            <div className="rounded-lg border p-3 text-sm">
               <p>
-                <span className="text-muted-foreground">UID:</span>{" "}
-                <span className="font-mono">{product.productUid}</span>
+                <span className="text-muted-foreground">Combined UID:</span>{" "}
+                <span className="font-mono">{combinedUid}</span>
               </p>
-              <p>
-                {product.name} — {product.make} {product.model}
-              </p>
-              <p className="text-muted-foreground">SN {product.serialNumber}</p>
             </div>
           )}
         </CardContent>
@@ -212,52 +313,56 @@ export function QcWorkflow() {
 
       <Card>
         <CardHeader>
-          <CardTitle>3. Item UIDs & QC</CardTitle>
-          <CardDescription>Record sub-component or line-item UIDs, result, notes, and photos.</CardDescription>
+          <CardTitle>3. QC Form (Dynamic)</CardTitle>
+          <CardDescription>
+            Form fields change based on product type and BOM. Result is automatic (Pass/Fail).
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Item / component UIDs</Label>
-              {items.map((row, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    value={row}
-                    onChange={(e) => setItem(i, e.target.value)}
-                    className="font-mono"
-                    placeholder="Scan or type UID"
-                  />
-                  <QrScannerButton
-                    onScan={(text) => {
-                      setItem(i, text.trim());
-                    }}
-                  />
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addItemRow}>
-                Add row
-              </Button>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Result</Label>
-                <Select value={passStatus} onValueChange={(v) => setPassStatus(v as typeof passStatus)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pass">Pass</SelectItem>
-                    <SelectItem value="conditional">Conditional</SelectItem>
-                    <SelectItem value="fail">Fail</SelectItem>
-                  </SelectContent>
-                </Select>
+          {!product ? (
+            <p className="text-sm text-muted-foreground">Scan items and click Load in Section 2 first.</p>
+          ) : (
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div className="rounded-lg border p-3 text-sm">
+                <p>
+                  <span className="text-muted-foreground">Auto Result:</span>{" "}
+                  <span
+                    className={
+                      computedResult === "pass"
+                        ? "font-semibold text-green-600"
+                        : "font-semibold text-destructive"
+                    }
+                  >
+                    {computedResult.toUpperCase()}
+                  </span>
+                </p>
               </div>
-              <div className="space-y-2 sm:col-span-2">
+
+              <div className="space-y-2">
+                <Label>QC checks</Label>
+                <div className="space-y-2">
+                  {qcFields
+                    .filter((f) => f.type === "checkbox")
+                    .map((f) => (
+                      <label key={f.key} className="flex items-start gap-2 rounded-md border p-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={checks[f.key] === true}
+                          onChange={(e) => setChecks((prev) => ({ ...prev, [f.key]: e.target.checked }))}
+                        />
+                        <span className="text-sm">{f.label}</span>
+                      </label>
+                    ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="notes">Inspector notes</Label>
                 <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
               </div>
-              <div className="space-y-2 sm:col-span-2">
+
+              <div className="space-y-2">
                 <Label>Images</Label>
                 <input
                   ref={fileInputRef}
@@ -325,14 +430,19 @@ export function QcWorkflow() {
                   </div>
                 )}
               </div>
-            </div>
-
-            <Separator />
-
-            <Button type="submit" disabled={pending || !product}>
-              {pending ? "Saving…" : "Complete QC & generate final QR"}
-            </Button>
-          </form>
+              <Separator />
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={pending || computedResult !== "pass"}>
+                  {pending ? "Saving…" : "Complete QC & generate final QR"}
+                </Button>
+                {computedResult === "fail" && (
+                  <Button type="button" variant="secondary" onClick={rescan} disabled={pending}>
+                    Rescan items
+                  </Button>
+                )}
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
 

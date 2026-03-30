@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,24 @@ export function ProductQrForm({ initialProducts }: { initialProducts: ProductWit
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ProductWithQr[]>(initialProducts);
   const [loadingHistory, startHistoryTransition] = useTransition();
+
+  // These three are controlled so we can auto-fill from history and keep form editable.
+  const [nameValue, setNameValue] = useState("");
+  const [makeValue, setMakeValue] = useState("");
+  const [modelValue, setModelValue] = useState("");
+
+  useEffect(() => {
+    // Listen for selection from the sidebar.
+    const onSelect = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { name?: string; make?: string; model?: string } | undefined;
+      if (!detail) return;
+      if (typeof detail.name === "string") setNameValue(detail.name);
+      if (typeof detail.make === "string") setMakeValue(detail.make);
+      if (typeof detail.model === "string") setModelValue(detail.model);
+    };
+    window.addEventListener("qr-history-select", onSelect);
+    return () => window.removeEventListener("qr-history-select", onSelect);
+  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,6 +59,22 @@ export function ProductQrForm({ initialProducts }: { initialProducts: ProductWit
       setResult(newItem);
       setHistory((prev) => [newItem, ...prev]);
       toast.success(`Product ${res.productUid} created.`);
+
+      // Notify sidebar about the new item.
+      window.dispatchEvent(
+        new CustomEvent("qr-history-add", {
+          detail: {
+            productUid: newItem.productUid,
+            qrDataUrl: newItem.qrDataUrl,
+            name: newItem.name,
+            make: newItem.make,
+            model: newItem.model,
+            serialNumber: newItem.serialNumber,
+            quantity: newItem.quantity,
+          } satisfies ProductWithQr,
+        }),
+      );
+
       return;
     }
     toast.error(res.error);
@@ -67,15 +101,36 @@ export function ProductQrForm({ initialProducts }: { initialProducts: ProductWit
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" required maxLength={200} />
+                <Input
+                  id="name"
+                  name="name"
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  required
+                  maxLength={200}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="make">Make</Label>
-                <Input id="make" name="make" required maxLength={120} />
+                <Input
+                  id="make"
+                  name="make"
+                  value={makeValue}
+                  onChange={(e) => setMakeValue(e.target.value)}
+                  required
+                  maxLength={120}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="model">Model</Label>
-                <Input id="model" name="model" required maxLength={120} />
+                <Input
+                  id="model"
+                  name="model"
+                  value={modelValue}
+                  onChange={(e) => setModelValue(e.target.value)}
+                  required
+                  maxLength={120}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="serialNumber">Serial number</Label>
@@ -88,10 +143,6 @@ export function ProductQrForm({ initialProducts }: { initialProducts: ProductWit
               <div className="space-y-2">
                 <Label htmlFor="copies">Number of QR labels</Label>
                 <Input id="copies" name="copies" type="number" min={1} max={100} defaultValue={1} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="date">Date</Label>
-                <Input id="date" name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
               </div>
             </div>
             <Button type="submit" disabled={pending}>

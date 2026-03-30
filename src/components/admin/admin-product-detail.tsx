@@ -50,6 +50,7 @@ export function AdminProductDetail({ data }: { data: AdminProductDetailPayload }
   const qc = data.qcRecord;
   const formData = qc?.formData ?? null;
   const scanned = Array.isArray(qc?.scannedItemUids) ? qc.scannedItemUids : [];
+  const remainingQuantity = Math.max(0, data.quantity - scanned.length);
 
   return (
     <div className="space-y-6">
@@ -82,7 +83,7 @@ export function AdminProductDetail({ data }: { data: AdminProductDetailPayload }
               <Detail label="Make" value={data.make} />
               <Detail label="Model" value={data.model} />
               <Detail label="Serial" value={data.serialNumber} />
-              <Detail label="Quantity" value={String(data.quantity)} />
+              <Detail label="Remaining qty" value={String(remainingQuantity)} />
               <Detail label="Date" value={formatDateOnly(data.dateIso)} />
               <Detail label="Created by" value={`${data.createdBy.name} (${data.createdBy.email})`} />
             </CardContent>

@@ -12,6 +12,7 @@ const productSelect = {
   make: true,
   model: true,
   serialNumber: true,
+  quantity: true,
   status: true,
   createdAt: true,
   qcRecord: {
@@ -19,6 +20,7 @@ const productSelect = {
       performedBy: {
         select: { name: true, email: true },
       },
+      scannedItemUids: true,
     },
   },
 } as const;

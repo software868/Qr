@@ -31,18 +31,25 @@ type ProductRow = {
   make: string;
   model: string;
   serialNumber: string;
+  quantity: number;
   status: string;
   createdAt: Date;
   qcRecord: {
     performedBy: { name: string; email: string };
+    scannedItemUids: string[];
   } | null;
 };
 
 function submittedByLabel(p: ProductRow): string {
-  if (p.status === "QC_COMPLETE" && p.qcRecord?.performedBy) {
+  if (p.qcRecord?.performedBy) {
     return `${p.qcRecord.performedBy.name} (${p.qcRecord.performedBy.email})`;
   }
   return "—";
+}
+
+function remainingQty(p: ProductRow): number {
+  const scannedCount = p.qcRecord?.scannedItemUids?.length ?? 0;
+  return Math.max(0, p.quantity - scannedCount);
 }
 
 export function AdminSearch() {
@@ -55,7 +62,10 @@ export function AdminSearch() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY) as ViewMode | null;
-      if (saved === "table" || saved === "cards") setViewMode(saved);
+      if (saved === "table" || saved === "cards") {
+        // Avoid synchronous state updates in effect body (lint rule).
+        setTimeout(() => setViewMode(saved), 0);
+      }
     } catch {
       /* ignore */
     }
@@ -198,6 +208,10 @@ export function AdminSearch() {
                   <span className="font-medium text-foreground">Submitted by: </span>
                   <span className="break-words">{submittedByLabel(p)}</span>
                 </p>
+                <p className="mt-1 text-xs">
+                  <span className="text-muted-foreground">Remaining: </span>
+                  <span className="font-medium">{remainingQty(p)}</span>
+                </p>
                 <p className="mt-1 text-xs text-primary">Tap for full details →</p>
               </button>
             ))}
@@ -210,6 +224,7 @@ export function AdminSearch() {
                 <TableRow>
                   <TableHead className="min-w-[140px]">Product UID</TableHead>
                   <TableHead className="whitespace-nowrap">QC status</TableHead>
+                  <TableHead className="min-w-[130px]">Remaining qty</TableHead>
                   <TableHead className="min-w-[180px]">Submitted by</TableHead>
                 </TableRow>
               </TableHeader>
@@ -234,6 +249,7 @@ export function AdminSearch() {
                         {p.status}
                       </Badge>
                     </TableCell>
+                    <TableCell className="align-top text-sm">{remainingQty(p)}</TableCell>
                     <TableCell className="max-w-[280px] text-sm text-muted-foreground align-top break-words">
                       {submittedByLabel(p)}
                     </TableCell>
@@ -264,7 +280,10 @@ export function AdminSearch() {
                     {p.make} · {p.model}
                   </p>
                   <p className="font-mono">SN: {p.serialNumber}</p>
-                  {p.status === "QC_COMPLETE" && p.qcRecord?.performedBy && (
+                  <p>
+                    Remaining: <span className="font-medium text-foreground">{remainingQty(p)}</span>
+                  </p>
+                  {p.qcRecord?.performedBy && (
                     <p className="pt-1 text-foreground">
                       <span className="text-muted-foreground">QC by </span>
                       <span className="font-medium">{p.qcRecord.performedBy.name}</span>

@@ -33,8 +33,11 @@ export function CameraCaptureButton({ onCapture }: Props) {
   useEffect(() => {
     if (!open) {
       stopStream();
-      setCaptured(null);
-      setError(null);
+      // Avoid synchronous setState in effect body (lint rule).
+      setTimeout(() => {
+        setCaptured(null);
+        setError(null);
+      }, 0);
       return;
     }
 

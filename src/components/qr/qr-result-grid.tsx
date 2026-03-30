@@ -1,7 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { buildQrLabelsPrintableHtmlGrid, type QrPageSize } from "@/lib/qr-print-grid";
 
 type Props = {
   productUid: string;
@@ -27,46 +30,38 @@ export function QrResultGrid({
   const total = Math.max(1, Math.min(totalCopies, 100));
   const copies = Array.from({ length: total }, (_, i) => i + 1);
 
-  function download() {
-    const a = document.createElement("a");
-    a.href = qrDataUrl;
-    a.download = `${productUid}-qr.png`;
-    a.click();
-  }
+  const [pageSize, setPageSize] = useState<QrPageSize>("A4");
+  const printableHtml = useMemo(() => {
+    return buildQrLabelsPrintableHtmlGrid({
+      qrDataUrl,
+      total,
+      pageSize,
+      title: `QR Labels — ${productUid}`,
+    });
+  }, [qrDataUrl, total, pageSize, productUid]);
 
-  function printAll() {
+  function printFormattedAll() {
     const w = window.open("", "_blank");
     if (!w) return;
-
-    const pages = copies
-      .map(
-        (n) => `
-      <div style="page-break-inside:avoid;page-break-after:always;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;font-family:system-ui,sans-serif;">
-        <img src="${qrDataUrl}" alt="QR" width="180" height="180" style="image-rendering:pixelated;" />
-        <table style="margin-top:10px;font-size:11px;border-collapse:collapse;text-align:left;">
-          <tr><td style="padding:1px 10px 1px 0;color:#666;">UID</td><td style="font-weight:600;font-family:monospace;">${productUid}</td></tr>
-          <tr><td style="padding:1px 10px 1px 0;color:#666;">Name</td><td>${name}</td></tr>
-          <tr><td style="padding:1px 10px 1px 0;color:#666;">Make / Model</td><td>${make} ${model}</td></tr>
-          <tr><td style="padding:1px 10px 1px 0;color:#666;">Serial</td><td>${serialNumber}</td></tr>
-          <tr><td style="padding:1px 10px 1px 0;color:#666;">Quantity</td><td>${quantity}</td></tr>
-        </table>
-        <p style="margin-top:8px;font-size:13px;font-weight:600;letter-spacing:0.5px;">${n} / ${total}</p>
-      </div>`,
-      )
-      .join("");
-
-    w.document.write(`
-      <html>
-        <head><title>Print QR — ${productUid}</title>
-          <style>@page{margin:10mm}@media print{body{margin:0}div:last-child{page-break-after:auto}}</style>
-        </head>
-        <body style="margin:0;">${pages}</body>
-      </html>`);
+    w.document.write(printableHtml);
     w.document.close();
     w.onload = () => {
-      w.print();
-      w.close();
+      window.setTimeout(() => {
+        w.focus();
+        w.print();
+        w.close();
+      }, 700);
     };
+  }
+
+  function downloadFormattedHtml() {
+    const blob = new Blob([printableHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${productUid}-labels-${pageSize}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -78,12 +73,24 @@ export function QrResultGrid({
             ({total} {total === 1 ? "label" : "labels"})
           </span>
         </h2>
-        <div className="flex gap-2">
-          <Button type="button" onClick={printAll}>
-            Print all {total} labels
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-32">
+            <Select value={pageSize} onValueChange={(v) => setPageSize(v as QrPageSize)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Page size" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="A4">A4</SelectItem>
+                <SelectItem value="A3">A3</SelectItem>
+                <SelectItem value="A5">A5</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button type="button" onClick={printFormattedAll}>
+            Print formatted ({pageSize})
           </Button>
-          <Button type="button" variant="secondary" onClick={download}>
-            Download PNG
+          <Button type="button" variant="secondary" onClick={downloadFormattedHtml}>
+            Download printable HTML
           </Button>
         </div>
       </div>

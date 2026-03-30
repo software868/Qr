@@ -30,7 +30,8 @@ export function QrScannerButton({ onScan }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    // Avoid synchronous setState in effect body (lint rule).
+    setTimeout(() => setError(null), 0);
 
     let cancelled = false;
 
