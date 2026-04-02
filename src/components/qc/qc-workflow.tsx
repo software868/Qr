@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { ProductType } from "@prisma/client";
 import { toast } from "sonner";
 import { getBomTemplateAction, submitQcUtilFormAction } from "@/actions/qc";
-import { TVU_CHECKLIST_ROWS, BHP_CHECKLIST_ROWS } from "@/lib/qc-util/checklists";
+import {
+  TVU_CHECKLIST_ROWS,
+  BHP_CHECKLIST_ROWS,
+  CONTROL_PANEL_CHECKLIST_ROWS,
+  WVU_CHECKLIST_ROWS,
+  AAS_CHECKLIST_ROWS,
+} from "@/lib/qc-util/checklists";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -22,10 +28,12 @@ import { CameraCaptureButton } from "@/components/qc/camera-capture";
 import { QrDisplay } from "@/components/qr/qr-display";
 
 const TYPE_LABEL: Record<ProductType, string> = {
-  CONTROL_PANEL: "Control Panel",
+  CONTROL_PANEL: "Surgeon Control Panel",
   IPS: "IPS",
   THEATRE_VACUUM_UNIT: "Theatre Vacuum Unit (TVU)",
   BED_HEAD_PANEL: "Bed Head Panel (BHP)",
+  WARD_VACUUM_UNIT: "Ward Vacuum Unit (WVU)",
+  AREA_ALARM_SYSTEM: "Area Alarm System",
 };
 
 export function QcWorkflow() {
@@ -45,8 +53,11 @@ export function QcWorkflow() {
 
   useEffect(() => {
     if (
+      productType === ProductType.CONTROL_PANEL ||
       productType === ProductType.THEATRE_VACUUM_UNIT ||
       productType === ProductType.BED_HEAD_PANEL
+      || productType === ProductType.WARD_VACUUM_UNIT
+      || productType === ProductType.AREA_ALARM_SYSTEM
     ) {
       setBom(null);
       return;
@@ -76,6 +87,34 @@ export function QcWorkflow() {
       return;
     }
 
+    if (productType === ProductType.WARD_VACUUM_UNIT) {
+      const wvuFields = WVU_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(wvuFields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of wvuFields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.AREA_ALARM_SYSTEM) {
+      const aasFields = AAS_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(aasFields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of aasFields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
     if (productType === ProductType.BED_HEAD_PANEL) {
       const bhpFields = BHP_CHECKLIST_ROWS.map((r) => ({
         key: r.key,
@@ -86,6 +125,20 @@ export function QcWorkflow() {
 
       const nextChecks: Record<string, boolean> = {};
       for (const f of bhpFields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.CONTROL_PANEL) {
+      const cpFields = CONTROL_PANEL_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(cpFields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of cpFields) nextChecks[f.key] = false;
       setChecks(nextChecks);
       return;
     }
@@ -186,9 +239,25 @@ export function QcWorkflow() {
             <p className="text-sm text-muted-foreground">
               TVU does not use the BOM section. The finished-goods test report checklist is shown below.
             </p>
+          ) : productType === ProductType.CONTROL_PANEL ? (
+            <p className="text-sm text-muted-foreground">
+              Surgeon Control Panel uses the finished-goods test report checklist below.
+            </p>
+          ) : productType === ProductType.WARD_VACUUM_UNIT ? (
+            <p className="text-sm text-muted-foreground">
+              WVU does not use the BOM section. The finished-goods test report checklist is shown below.
+            </p>
           ) : productType === ProductType.BED_HEAD_PANEL ? (
             <p className="text-sm text-muted-foreground">
               BHP does not use the BOM section. The finished-goods test report checklist is shown below.
+            </p>
+          ) : productType === ProductType.WARD_VACUUM_UNIT ? (
+            <p className="text-sm text-muted-foreground">
+              WVU does not use the BOM section. The finished-goods test report checklist is shown below.
+            </p>
+          ) : productType === ProductType.AREA_ALARM_SYSTEM ? (
+            <p className="text-sm text-muted-foreground">
+              Area Alarm System does not use the BOM section. The finished-goods test report checklist is shown below.
             </p>
           ) : bom?.lines?.length ? (
             <Table>
@@ -269,6 +338,342 @@ export function QcWorkflow() {
                           {TVU_CHECKLIST_ROWS.map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2 text-sm">{row.srNo}</td>
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.CONTROL_PANEL ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm">
+                              <b>Surgeon Control Panel</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {/* Physical test sub-items */}
+                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(0, 5).map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(B) MICRO-BIOLOGICAL TEST</b>
+                            </td>
+                          </tr>
+
+                          {/* Micro-biological */}
+                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(5, 6).map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm">2</td>
+                              <td className="border p-2 text-sm">
+                                <b>{row.test}</b>
+                              </td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2" />
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(D) BIOLOGICAL TEST</b>
+                            </td>
+                          </tr>
+
+                          {/* Biological */}
+                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(6, 7).map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm">3</td>
+                              <td className="border p-2 text-sm">
+                                <b>{row.test}</b>
+                              </td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2" />
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.WARD_VACUUM_UNIT ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm">
+                              <b>Suction Jar</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {WVU_CHECKLIST_ROWS.slice(0, 5).map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({ ...prev, [row.key]: e.target.checked }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+
+                          <tr>
+                            <td className="border p-2" />
+                            <td className="border p-2">
+                              <b>Jar Cap</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {/* Jar Cap Material */}
+                          {WVU_CHECKLIST_ROWS.slice(5, 6).map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({ ...prev, [row.key]: e.target.checked }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* Fixture header */}
+                          <tr>
+                            <td className="border p-2" />
+                            <td className="border p-2">
+                              <b>Fixture</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {/* Fixture sub items: indexes 6..13 */}
+                          {WVU_CHECKLIST_ROWS.slice(6, 14).map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({ ...prev, [row.key]: e.target.checked }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+
+                          <tr>
+                            <td className="border p-2 text-sm">2</td>
+                            <td className="border p-2 text-sm">
+                              <b>Leakage</b>
+                            </td>
+                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[14].specification}</td>
+                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[14].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[WVU_CHECKLIST_ROWS[14].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({
+                                    ...prev,
+                                    [WVU_CHECKLIST_ROWS[14].key]: e.target.checked,
+                                  }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.AREA_ALARM_SYSTEM ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm">
+                              <b>Area Alarm System</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {AAS_CHECKLIST_ROWS.map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm" />
                               <td className="border p-2 text-sm">{row.test}</td>
                               <td className="border p-2 text-sm">{row.specification}</td>
                               <td className="border p-2 text-sm">{row.observation}</td>

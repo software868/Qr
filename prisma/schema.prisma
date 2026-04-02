@@ -25,6 +25,8 @@ enum ProductType {
   IPS
   THEATRE_VACUUM_UNIT
   BED_HEAD_PANEL
+  WARD_VACUUM_UNIT
+  AREA_ALARM_SYSTEM
 }
 
 model User {
