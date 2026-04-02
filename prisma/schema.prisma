@@ -23,7 +23,6 @@ enum ProductStatus {
 enum ProductType {
   CONTROL_PANEL
   IPS
-  AVS
   THEATRE_VACUUM_UNIT
   BED_HEAD_PANEL
 }

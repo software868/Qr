@@ -26,15 +26,6 @@ const bomSeeds: {
       { partCode: "IPS-CBL", description: "Harness kit", expectedQty: 1 },
     ],
   },
-  {
-    productType: ProductType.AVS,
-    name: "AVS BOM",
-    lines: [
-      { partCode: "AVS-VALVE", description: "Primary valve assembly", expectedQty: 1 },
-      { partCode: "AVS-ACT", description: "Actuator", expectedQty: 1 },
-      { partCode: "AVS-SAFE", description: "Safety interlock", expectedQty: 1 },
-    ],
-  },
 ];
 
 async function main() {
