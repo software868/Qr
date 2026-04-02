@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { getBomForType } from "@/services/qc.service";
 import { createQcUtilSubmission } from "@/services/qc-util.service";
 import { logAudit } from "@/services/audit.service";
+import { getExpectedChecklistKeys } from "@/lib/qc-util/checklists";
 import type { Prisma } from "@prisma/client";
 
 export async function getBomTemplateAction(productType: ProductType) {
@@ -46,12 +47,22 @@ export async function submitQcUtilFormAction(formData: FormData) {
   });
   if (!parsed.success) return { ok: false as const, error: "Invalid form data" };
 
-  const bom = await getBomForType(parsed.data.productType);
-  const lines = bom?.lines ?? [];
-  const checkboxKeys = lines.map((l) => `bomOk:${l.id}`);
   const checks = parsed.data.bomChecks ?? {};
-  const allPass =
-    checkboxKeys.length === 0 || checkboxKeys.every((k) => checks[k] === true);
+
+  // Expected checklist keys depend on product type.
+  // - TVU uses hardcoded keys (no BOM required).
+  // - Everything else uses BOM template lines: `bomOk:${line.id}`
+  let checkboxKeys = getExpectedChecklistKeys(parsed.data.productType);
+  if (checkboxKeys.length === 0) {
+    const bom = await getBomForType(parsed.data.productType);
+    const lines = bom?.lines ?? [];
+    checkboxKeys = lines.map((l) => `bomOk:${l.id}`);
+  }
+
+  if (checkboxKeys.length === 0) {
+    return { ok: false as const, error: "Checklist is not configured for this product type." };
+  }
+  const allPass = checkboxKeys.every((k) => checks[k] === true);
   if (!allPass) {
     return { ok: false as const, error: "All checklist items must pass before submission." };
   }

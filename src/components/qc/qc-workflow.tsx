@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { ProductType } from "@prisma/client";
 import { toast } from "sonner";
 import { getBomTemplateAction, submitQcUtilFormAction } from "@/actions/qc";
+import { TVU_CHECKLIST_ROWS, BHP_CHECKLIST_ROWS } from "@/lib/qc-util/checklists";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,8 @@ import { QrDisplay } from "@/components/qr/qr-display";
 const TYPE_LABEL: Record<ProductType, string> = {
   CONTROL_PANEL: "Control Panel",
   IPS: "IPS",
-  AVS: "AVS",
+  THEATRE_VACUUM_UNIT: "Theatre Vacuum Unit (TVU)",
+  BED_HEAD_PANEL: "Bed Head Panel (BHP)",
 };
 
 export function QcWorkflow() {
@@ -42,6 +44,14 @@ export function QcWorkflow() {
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
+    if (
+      productType === ProductType.THEATRE_VACUUM_UNIT ||
+      productType === ProductType.BED_HEAD_PANEL
+    ) {
+      setBom(null);
+      return;
+    }
+
     startTransition(async () => {
       const res = await getBomTemplateAction(productType);
       if (res.ok && res.bom) setBom(res.bom);
@@ -51,6 +61,35 @@ export function QcWorkflow() {
 
   useEffect(() => {
     if (finalQr) return;
+
+    if (productType === ProductType.THEATRE_VACUUM_UNIT) {
+      const tvuFields = TVU_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: `${r.test} — ${r.specification}`,
+      }));
+      setQcFields(tvuFields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of tvuFields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.BED_HEAD_PANEL) {
+      const bhpFields = BHP_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(bhpFields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of bhpFields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
     startTransition(async () => {
       const res = await fetch(`/api/qc-form?productType=${encodeURIComponent(String(productType))}`);
       const json: unknown = await res.json();
@@ -70,11 +109,13 @@ export function QcWorkflow() {
     });
   }, [productType, finalQr]);
 
+  const checkboxKeys = useMemo(() => qcFields.filter((f) => f.type === "checkbox").map((f) => f.key), [qcFields]);
+  const hasChecklist = checkboxKeys.length > 0;
+
   const computedResult = useMemo(() => {
-    const checkboxKeys = qcFields.filter((f) => f.type === "checkbox").map((f) => f.key);
-    if (checkboxKeys.length === 0) return "pass" as const;
+    if (!hasChecklist) return "fail" as const;
     return checkboxKeys.every((k) => checks[k] === true) ? ("pass" as const) : ("fail" as const);
-  }, [qcFields, checks]);
+  }, [checkboxKeys, checks, hasChecklist]);
 
   const resetSession = useCallback(() => {
     for (const u of previews) URL.revokeObjectURL(u);
@@ -88,6 +129,10 @@ export function QcWorkflow() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!hasChecklist) {
+      toast.error("Checklist is not configured for this product type yet.");
+      return;
+    }
     if (computedResult === "fail") {
       toast.error("All checklist items must pass before submission.");
       return;
@@ -137,7 +182,15 @@ export function QcWorkflow() {
               </SelectContent>
             </Select>
           </div>
-          {bom?.lines?.length ? (
+          {productType === ProductType.THEATRE_VACUUM_UNIT ? (
+            <p className="text-sm text-muted-foreground">
+              TVU does not use the BOM section. The finished-goods test report checklist is shown below.
+            </p>
+          ) : productType === ProductType.BED_HEAD_PANEL ? (
+            <p className="text-sm text-muted-foreground">
+              BHP does not use the BOM section. The finished-goods test report checklist is shown below.
+            </p>
+          ) : bom?.lines?.length ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -157,7 +210,7 @@ export function QcWorkflow() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-sm text-muted-foreground">Loading BOM…</p>
+            <p className="text-sm text-muted-foreground">{bom ? "No BOM configured for this type." : "Loading BOM…"}</p>
           )}
         </CardContent>
       </Card>
@@ -187,25 +240,142 @@ export function QcWorkflow() {
                     {computedResult.toUpperCase()}
                   </span>
                 </p>
+                {!hasChecklist && <p className="mt-1 text-xs text-muted-foreground">Select the type again when BOM/checklist is configured.</p>}
               </div>
 
               <div className="space-y-2">
                 <Label>Checklist</Label>
-                <div className="space-y-2">
-                  {qcFields
-                    .filter((f) => f.type === "checkbox")
-                    .map((f) => (
-                      <label key={f.key} className="flex items-start gap-2 rounded-md border p-3">
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={checks[f.key] === true}
-                          onChange={(e) => setChecks((prev) => ({ ...prev, [f.key]: e.target.checked }))}
-                        />
-                        <span className="text-sm">{f.label}</span>
-                      </label>
-                    ))}
-                </div>
+                {productType === ProductType.THEATRE_VACUUM_UNIT ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span className={computedResult === "pass" ? "font-semibold text-green-600" : "font-semibold text-red-600"}>
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {TVU_CHECKLIST_ROWS.map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm">{row.srNo}</td>
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.BED_HEAD_PANEL ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm">
+                              <b>Bed Head Panel</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {BHP_CHECKLIST_ROWS.map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {qcFields
+                      .filter((f) => f.type === "checkbox")
+                      .map((f) => (
+                        <label key={f.key} className="flex items-start gap-2 rounded-md border p-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={checks[f.key] === true}
+                            onChange={(e) => setChecks((prev) => ({ ...prev, [f.key]: e.target.checked }))}
+                          />
+                          <span className="text-sm">{f.label}</span>
+                        </label>
+                      ))}
+
+                    {!hasChecklist && <p className="text-sm text-muted-foreground">No checklist configured yet for this type.</p>}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -293,7 +463,7 @@ export function QcWorkflow() {
               </div>
               <Separator />
               <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={pending || computedResult !== "pass"}>
+                <Button type="submit" disabled={pending || !hasChecklist || computedResult !== "pass"}>
                   {pending ? "Saving…" : "Submit & generate UID + QR"}
                 </Button>
               </div>
