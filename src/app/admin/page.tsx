@@ -1,4 +1,4 @@
-import { AdminSearch } from "@/components/admin/admin-search";
+import { AdminQcUtilSearch } from "@/components/admin/admin-qc-util-search";
 import { ExportCsvButton } from "@/components/admin/export-csv-button";
 
 export default function AdminDashboardPage() {
@@ -6,12 +6,12 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <p className="max-w-2xl text-muted-foreground">
-          Filter by UID, serial, or name. Switch between table and card views. Open a row or card for full details,
-          BOM, QC data, and images.
+          Every Q-Util Check submission: date, generated entry UID, product type, full form data, images, and who
+          submitted it. Open a row for details. Export CSV for reporting.
         </p>
         <ExportCsvButton />
       </div>
-      <AdminSearch />
+      <AdminQcUtilSearch />
     </div>
   );
 }

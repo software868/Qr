@@ -37,6 +37,7 @@ model User {
 
   productsCreated Product[] @relation("ProductCreator")
   qcRecords       QcRecord[]
+  qcUtilEntries   QcUtilEntry[]
 }
 
 model Product {
@@ -108,6 +109,34 @@ model QcImage {
   createdAt   DateTime @default(now())
 
   @@index([qcRecordId])
+}
+
+/** Standalone Q-Util Check submission (no manufacturing Product row). */
+model QcUtilEntry {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  entryUid      String      @unique
+  productType   ProductType
+  formData      Json
+  performedById String      @db.ObjectId
+  performedBy   User        @relation(fields: [performedById], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  images        QcUtilImage[]
+
+  @@index([performedById])
+  @@index([createdAt])
+}
+
+model QcUtilImage {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  qcUtilEntryId String      @db.ObjectId
+  qcUtilEntry   QcUtilEntry @relation(fields: [qcUtilEntryId], references: [id], onDelete: Cascade)
+  url           String
+  publicId      String
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+
+  @@index([qcUtilEntryId])
 }
 
 model AuditLog {

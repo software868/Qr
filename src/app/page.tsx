@@ -7,7 +7,7 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col">
       <header className="border-b">
         <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <span className="font-semibold">Product QC</span>
+          <span className="font-semibold">Q-Util</span>
           <Button asChild variant="outline" size="sm">
             <Link href="/login">Sign in</Link>
           </Button>
@@ -16,32 +16,20 @@ export default function HomePage() {
       <main className="container mx-auto flex flex-1 flex-col px-4 py-10">
         <div className="mx-auto w-full max-w-3xl space-y-8">
           <div className="text-center">
-            <h1 className="text-3xl font-semibold tracking-tight">Product Tracking & Quality Control</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Quality Checker &amp; Admin</h1>
             <p className="mt-2 text-muted-foreground">
-              Sign in, or create the account type that matches your role.
+              Sign in, or create a staff account for Q-Util Check. Administrators manage all submissions.
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-1">
             <Card className="flex flex-col">
               <CardHeader>
-                <CardTitle>QR Generator</CardTitle>
-                <CardDescription>Create products, Product UIDs, and printable QR labels.</CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto flex flex-col gap-2 sm:flex-row">
-                <Button asChild className="flex-1">
-                  <Link href="/register/qr">Register</Link>
-                </Button>
-                <Button asChild variant="outline" className="flex-1">
-                  <Link href="/login?next=/qr">Sign in</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="flex flex-col">
-              <CardHeader>
-                <CardTitle>Quality check</CardTitle>
-                <CardDescription>BOM-based QC, photos, and final traceability UIDs.</CardDescription>
+                <CardTitle>Quality Checker (Q-Util Check)</CardTitle>
+                <CardDescription>
+                  Select a product type, complete the dynamic checklist, attach photos, then get a unique ID and
+                  printable QR label.
+                </CardDescription>
               </CardHeader>
               <CardContent className="mt-auto flex flex-col gap-2 sm:flex-row">
                 <Button asChild className="flex-1">

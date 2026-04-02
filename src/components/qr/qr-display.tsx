@@ -10,24 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildQrLabelsPrintableHtmlGrid, type QrPageSize } from "@/lib/qr-print-grid";
 
 type Props = {
-  productUid: string;
+  /** Label UID shown on the card and in filenames (e.g. QUT-…). */
+  uid: string;
   qrDataUrl: string;
-  name: string;
-  make: string;
-  model: string;
-  serialNumber: string;
-  quantity: number;
+  /** Optional rows under the QR preview (e.g. product type). */
+  detailRows: { label: string; value: string }[];
 };
 
-export function QrDisplay({
-  productUid,
-  qrDataUrl,
-  name,
-  make,
-  model,
-  serialNumber,
-  quantity,
-}: Props) {
+export function QrDisplay({ uid, qrDataUrl, detailRows }: Props) {
   const [copies, setCopies] = useState(1);
   const [pageSize, setPageSize] = useState<QrPageSize>("A4");
 
@@ -37,9 +27,9 @@ export function QrDisplay({
       qrDataUrl,
       total,
       pageSize,
-      title: `QR Labels — ${productUid}`,
+      title: `QR Labels — ${uid}`,
     });
-  }, [qrDataUrl, total, pageSize, productUid]);
+  }, [qrDataUrl, total, pageSize, uid]);
 
   function printLabelsFormatted() {
     const w = window.open("", "_blank");
@@ -61,7 +51,7 @@ export function QrDisplay({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${productUid}-labels-${pageSize}.html`;
+    a.download = `${uid}-labels-${pageSize}.html`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -69,33 +59,28 @@ export function QrDisplay({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-mono text-sm">{productUid}</CardTitle>
-        <CardDescription>Download or print QR labels for the physical units.</CardDescription>
+        <CardTitle className="font-mono text-sm">{uid}</CardTitle>
+        <CardDescription>Download or print QR labels for the physical product.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* QR preview */}
         <div className="flex justify-center rounded-lg border bg-white p-3 dark:bg-zinc-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrDataUrl} alt="Product QR" width={100} height={100} />
+          <img src={qrDataUrl} alt="Entry QR" width={100} height={100} />
         </div>
 
-        {/* Product details */}
         <div className="rounded-lg border p-3 text-sm">
           <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            <span className="text-muted-foreground">Name</span>
-            <span className="font-medium">{name}</span>
-            <span className="text-muted-foreground">Make / Model</span>
-            <span className="font-medium">{make} {model}</span>
-            <span className="text-muted-foreground">Serial</span>
-            <span className="font-mono font-medium">{serialNumber}</span>
-            <span className="text-muted-foreground">Quantity</span>
-            <span className="font-medium">{quantity}</span>
+            {detailRows.map((row) => (
+              <div key={row.label} className="contents">
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="font-medium">{row.value}</span>
+              </div>
+            ))}
           </div>
         </div>
 
         <Separator />
 
-        {/* Print controls */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="w-28 space-y-1.5">
             <Label htmlFor="copies">Copies</Label>
@@ -122,7 +107,10 @@ export function QrDisplay({
             </Select>
           </div>
           <p className="text-xs text-muted-foreground sm:pb-1.5">
-            Each label shows <strong>1/{total}</strong>, <strong>2/{total}</strong>, … <strong>{total}/{total}</strong>
+            Each label shows <strong>1/{total}</strong>, <strong>2/{total}</strong>, …{" "}
+            <strong>
+              {total}/{total}
+            </strong>
           </p>
         </div>
 

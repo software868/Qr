@@ -14,7 +14,11 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ ok: false as const, error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role !== "QC_USER" && session.user.role !== "ADMIN") {
+  if (
+    session.user.role !== "QC_USER" &&
+    session.user.role !== "ADMIN" &&
+    session.user.role !== "QR_USER"
+  ) {
     return NextResponse.json({ ok: false as const, error: "Forbidden" }, { status: 403 });
   }
 

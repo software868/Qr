@@ -2,45 +2,32 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { isMongoObjectIdString } from "@/lib/mongo";
 import { getBomForType } from "@/services/qc.service";
 
-const productSelect = {
+const entryListSelect = {
   id: true,
-  productUid: true,
-  name: true,
-  make: true,
-  model: true,
-  serialNumber: true,
-  quantity: true,
-  status: true,
+  entryUid: true,
+  productType: true,
   createdAt: true,
-  qcRecord: {
-    select: {
-      performedBy: {
-        select: { name: true, email: true },
-      },
-      scannedItemUids: true,
-    },
-  },
+  performedBy: { select: { name: true, email: true } },
 } as const;
 
-export async function getAllProductsAction() {
+export async function getAllQcUtilEntriesAction() {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { ok: false as const, error: "Unauthorized" };
   }
 
-  const products = await prisma.product.findMany({
+  const entries = await prisma.qcUtilEntry.findMany({
     orderBy: { createdAt: "desc" },
-    take: 100,
-    select: productSelect,
+    take: 200,
+    select: entryListSelect,
   });
 
-  return { ok: true as const, products };
+  return { ok: true as const, entries };
 }
 
-export async function searchProductsAction(query: string) {
+export async function searchQcUtilEntriesAction(query: string) {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { ok: false as const, error: "Unauthorized" };
@@ -48,109 +35,76 @@ export async function searchProductsAction(query: string) {
 
   const q = query.trim();
   if (q.length === 0) {
-    return getAllProductsAction();
+    return getAllQcUtilEntriesAction();
   }
 
-  const products = await prisma.product.findMany({
+  const entries = await prisma.qcUtilEntry.findMany({
     where: {
-      OR: [
-        { productUid: { contains: q, mode: "insensitive" } },
-        { serialNumber: { contains: q, mode: "insensitive" } },
-        { name: { contains: q, mode: "insensitive" } },
-      ],
+      OR: [{ entryUid: { contains: q, mode: "insensitive" } }],
     },
     orderBy: { createdAt: "desc" },
-    take: 100,
-    select: productSelect,
+    take: 200,
+    select: entryListSelect,
   });
 
-  return { ok: true as const, products };
+  return { ok: true as const, entries };
 }
 
-export async function getProductDetailAction(uid: string) {
+export async function getQcUtilEntryDetailAction(entryUid: string) {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { ok: false as const, error: "Unauthorized" };
   }
 
-  const where = isMongoObjectIdString(uid)
-    ? { OR: [{ productUid: uid }, { id: uid }] }
-    : { productUid: uid };
+  const decoded = decodeURIComponent(entryUid);
+  const entry = await prisma.qcUtilEntry.findUnique({
+    where: { entryUid: decoded },
+    include: {
+      images: { orderBy: { sortOrder: "asc" } },
+      performedBy: { select: { name: true, email: true } },
+    },
+  });
 
-  let product;
-  try {
-    product = await prisma.product.findFirst({
-      where,
-      include: {
-        createdBy: { select: { name: true, email: true } },
-        qcRecord: {
-          include: {
-            images: { orderBy: { sortOrder: "asc" } },
-            performedBy: { select: { name: true, email: true } },
-          },
-        },
-      },
-    });
-  } catch (e) {
-    console.error("[getProductDetailAction] prisma findFirst failed:", e);
-    return { ok: false as const, error: "Lookup failed" };
-  }
-
-  if (!product) {
+  if (!entry) {
     return { ok: false as const, error: "Not found" };
   }
 
   let bom = null;
   try {
-    bom = product.qcRecord ? await getBomForType(product.qcRecord.productType) : null;
-  } catch (e) {
-    console.error("[getProductDetailAction] getBomForType failed:", e);
+    bom = await getBomForType(entry.productType);
+  } catch {
+    /* ignore */
   }
 
-  return { ok: true as const, product, bom };
+  return { ok: true as const, entry, bom };
 }
 
-export async function exportProductsCsvAction() {
+export async function exportQcUtilEntriesCsvAction() {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") {
     return { ok: false as const, error: "Unauthorized" };
   }
 
-  const products = await prisma.product.findMany({
+  const entries = await prisma.qcUtilEntry.findMany({
     orderBy: { createdAt: "desc" },
     take: 5000,
     include: {
-      qcRecord: {
-        select: { finalProductUid: true, productType: true },
-      },
+      performedBy: { select: { email: true, name: true } },
     },
   });
 
-  const header = [
-    "productUid",
-    "name",
-    "make",
-    "model",
-    "serialNumber",
-    "quantity",
-    "status",
-    "finalProductUid",
-    "qcType",
-    "createdAt",
-  ].join(",");
+  const header = ["entryUid", "productType", "submittedByName", "submittedByEmail", "createdAt", "formJson"].join(
+    ",",
+  );
 
-  const rows = products.map((p) =>
+  const rows = entries.map((e) =>
     [
-      p.productUid,
-      escapeCsv(p.name),
-      escapeCsv(p.make),
-      escapeCsv(p.model),
-      escapeCsv(p.serialNumber),
-      p.quantity,
-      p.status,
-      p.qcRecord?.finalProductUid ?? "",
-      p.qcRecord?.productType ?? "",
-      p.createdAt.toISOString(),
+      e.entryUid,
+      e.productType,
+      escapeCsv(e.performedBy.name),
+      escapeCsv(e.performedBy.email),
+      e.createdAt.toISOString(),
+      escapeCsv(JSON.stringify(e.formData)),
     ].join(","),
   );
 

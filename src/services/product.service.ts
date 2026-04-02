@@ -13,6 +13,11 @@ export function generateFinalProductUid(): string {
   return `FIN-${uidAlphabet()}`;
 }
 
+/** Unique ID for Q-Util Check entries (encoded in label QR). */
+export function generateQcUtilEntryUid(): string {
+  return `QUT-${uidAlphabet()}`;
+}
+
 export async function qrDataUrlForPayload(payload: string): Promise<string> {
   return QRCode.toDataURL(payload, {
     width: 320,

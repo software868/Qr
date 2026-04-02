@@ -63,7 +63,7 @@ function LoginForm() {
           const session = await sessionRes.json();
           const role = session?.user?.role as string | undefined;
           if (role === "ADMIN") dest = "/admin";
-          else if (role === "QR_USER") dest = "/qr";
+          else if (role === "QR_USER") dest = "/qc";
           else if (role === "QC_USER") dest = "/qc";
           else dest = "/";
         } catch {

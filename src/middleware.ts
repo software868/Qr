@@ -17,6 +17,10 @@ const sessionCookieName = useSecureCookies
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/qr" || pathname.startsWith("/qr/")) {
+    return NextResponse.redirect(new URL("/qc", request.url));
+  }
+
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
@@ -43,7 +47,8 @@ export async function middleware(request: NextRequest) {
     pathname === "/" ||
     pathname === "/unauthorized" ||
     pathname.startsWith("/p/") ||
-    pathname.startsWith("/f/");
+    pathname.startsWith("/f/") ||
+    pathname.startsWith("/q/");
 
   if (pathname === "/" && role) {
     return NextResponse.redirect(new URL(defaultPathForRole(role), request.url));
