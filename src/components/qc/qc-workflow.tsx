@@ -243,21 +243,9 @@ export function QcWorkflow() {
             <p className="text-sm text-muted-foreground">
               Surgeon Control Panel uses the finished-goods test report checklist below.
             </p>
-          ) : productType === ProductType.WARD_VACUUM_UNIT ? (
-            <p className="text-sm text-muted-foreground">
-              WVU does not use the BOM section. The finished-goods test report checklist is shown below.
-            </p>
           ) : productType === ProductType.BED_HEAD_PANEL ? (
             <p className="text-sm text-muted-foreground">
               BHP does not use the BOM section. The finished-goods test report checklist is shown below.
-            </p>
-          ) : productType === ProductType.WARD_VACUUM_UNIT ? (
-            <p className="text-sm text-muted-foreground">
-              WVU does not use the BOM section. The finished-goods test report checklist is shown below.
-            </p>
-          ) : productType === ProductType.AREA_ALARM_SYSTEM ? (
-            <p className="text-sm text-muted-foreground">
-              Area Alarm System does not use the BOM section. The finished-goods test report checklist is shown below.
             </p>
           ) : bom?.lines?.length ? (
             <Table>
