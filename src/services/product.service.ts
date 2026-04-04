@@ -13,7 +13,7 @@ export function generateFinalProductUid(): string {
   return `FIN-${uidAlphabet()}`;
 }
 
-/** Unique ID for Q-Util Check entries (encoded in label QR). */
+/** Unique ID for check form entries (encoded in label QR). */
 export function generateQcUtilEntryUid(): string {
   return `QUT-${uidAlphabet()}`;
 }

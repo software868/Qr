@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import { getQcUtilEntryDetailAction } from "@/actions/admin";
 import {
-  AdminQcUtilDetail,
-  type AdminQcUtilDetailPayload,
-} from "@/components/admin/admin-qc-util-detail";
+  AdminQcUtilEntryView,
+  type AdminQcUtilEntryViewData,
+} from "@/components/admin/admin-qc-util-entry-view";
 
 function safeToIso(d: Date): string {
   const t = d.getTime();
@@ -22,35 +22,26 @@ export default async function AdminQcUtilEntryPage({
     notFound();
   }
 
-  const { entry, bom } = res;
+  const { entry } = res;
   const rawForm = entry.formData;
   const formData =
     rawForm && typeof rawForm === "object" && !Array.isArray(rawForm)
       ? (rawForm as {
           passStatus?: string;
           inspectorNotes?: string;
+          checklist?: Record<string, boolean>;
           bomChecks?: Record<string, boolean>;
         })
       : null;
 
-  const payload: AdminQcUtilDetailPayload = {
+  const payload: AdminQcUtilEntryViewData = {
     entryUid: entry.entryUid,
     productType: entry.productType,
     createdAtIso: safeToIso(entry.createdAt),
     performedBy: entry.performedBy,
     formData,
     images: (entry.images ?? []).map((img) => ({ id: img.id, url: img.url })),
-    bom: bom
-      ? {
-          lines: (bom.lines ?? []).map((line) => ({
-            id: line.id,
-            partCode: line.partCode,
-            description: line.description,
-            expectedQty: line.expectedQty,
-          })),
-        }
-      : null,
   };
 
-  return <AdminQcUtilDetail data={payload} />;
+  return <AdminQcUtilEntryView data={payload} />;
 }

@@ -2,7 +2,6 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { getBomForType } from "@/services/qc.service";
 
 const entryListSelect = {
   id: true,
@@ -11,6 +10,25 @@ const entryListSelect = {
   createdAt: true,
   performedBy: { select: { name: true, email: true } },
 } as const;
+
+type EntryListRowRaw = {
+  id: string;
+  entryUid: string;
+  productType: string;
+  createdAt: Date;
+  performedBy: { name: string; email: string };
+};
+
+/** Server actions must return JSON-serializable data (no Date objects). */
+function serializeEntryListRows(rows: EntryListRowRaw[]) {
+  return rows.map((e) => ({
+    id: e.id,
+    entryUid: e.entryUid,
+    productType: e.productType,
+    createdAt: e.createdAt.toISOString(),
+    performedBy: e.performedBy,
+  }));
+}
 
 export async function getAllQcUtilEntriesAction() {
   const session = await auth();
@@ -24,7 +42,7 @@ export async function getAllQcUtilEntriesAction() {
     select: entryListSelect,
   });
 
-  return { ok: true as const, entries };
+  return { ok: true as const, entries: serializeEntryListRows(entries) };
 }
 
 export async function searchQcUtilEntriesAction(query: string) {
@@ -47,7 +65,7 @@ export async function searchQcUtilEntriesAction(query: string) {
     select: entryListSelect,
   });
 
-  return { ok: true as const, entries };
+  return { ok: true as const, entries: serializeEntryListRows(entries) };
 }
 
 export async function getQcUtilEntryDetailAction(entryUid: string) {
@@ -69,14 +87,7 @@ export async function getQcUtilEntryDetailAction(entryUid: string) {
     return { ok: false as const, error: "Not found" };
   }
 
-  let bom = null;
-  try {
-    bom = await getBomForType(entry.productType);
-  } catch {
-    /* ignore */
-  }
-
-  return { ok: true as const, entry, bom };
+  return { ok: true as const, entry };
 }
 
 export async function exportQcUtilEntriesCsvAction() {

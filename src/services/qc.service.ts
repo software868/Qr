@@ -3,13 +3,6 @@ import { prisma } from "@/lib/db";
 import { generateFinalProductUid, qrDataUrlForPayload } from "@/services/product.service";
 import { uploadQcImageBuffer } from "@/services/cloudinary.service";
 
-export async function getBomForType(productType: ProductType) {
-  return prisma.bomTemplate.findUnique({
-    where: { productType },
-    include: { lines: { orderBy: { sortOrder: "asc" } } },
-  });
-}
-
 export async function findProductByUid(productUid: string) {
   return prisma.product.findUnique({
     where: { productUid },

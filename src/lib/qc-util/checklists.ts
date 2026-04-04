@@ -9,7 +9,7 @@ export type CheckboxRow = {
 };
 
 // Theatre Vacuum Unit (TVU) checklist (Finished Goods Test Report)
-// Keys are stored in `QcUtilEntry.formData.bomChecks` and validated server-side.
+// Keys are stored in check form entry `formData.checklist` (QcUtilEntry JSON) and validated server-side.
 export const TVU_CHECKLIST_ROWS: CheckboxRow[] = [
   {
     key: "tvu:material-finish",
@@ -221,6 +221,8 @@ export const AAS_CHECKLIST_ROWS: CheckboxRow[] = [
 
 export function getExpectedChecklistKeys(productType: ProductType): string[] {
   switch (productType) {
+    case "IPS":
+      return [];
     case "CONTROL_PANEL":
       return CONTROL_PANEL_CHECKLIST_ROWS.map((r) => r.key);
     case "THEATRE_VACUUM_UNIT":
@@ -235,5 +237,21 @@ export function getExpectedChecklistKeys(productType: ProductType): string[] {
     default:
       return [];
   }
+}
+
+const ALL_CHECKLIST_ROWS: CheckboxRow[] = [
+  ...TVU_CHECKLIST_ROWS,
+  ...WVU_CHECKLIST_ROWS,
+  ...BHP_CHECKLIST_ROWS,
+  ...CONTROL_PANEL_CHECKLIST_ROWS,
+  ...AAS_CHECKLIST_ROWS,
+];
+
+/** Human-readable label for a stored checklist key in entry `formData`. */
+export function labelForChecklistKey(key: string): string {
+  const row = ALL_CHECKLIST_ROWS.find((r) => r.key === key);
+  if (row) return `${row.test} — ${row.specification}`;
+  if (key.startsWith("bomOk:")) return "Legacy line item";
+  return key;
 }
 

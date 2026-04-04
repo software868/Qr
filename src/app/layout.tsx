@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Product Tracking & QC",
-  description: "Product tracking and quality control",
+  title: "Check form",
+  description: "Quality check form, submissions, and admin",
 };
 
 export default function RootLayout({

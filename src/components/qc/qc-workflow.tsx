@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ProductType } from "@prisma/client";
 import { toast } from "sonner";
-import { getBomTemplateAction, submitQcUtilFormAction } from "@/actions/qc";
+import { submitQcUtilFormAction } from "@/actions/qc";
 import {
   TVU_CHECKLIST_ROWS,
   BHP_CHECKLIST_ROWS,
@@ -22,26 +22,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { CameraCaptureButton } from "@/components/qc/camera-capture";
 import { QrDisplay } from "@/components/qr/qr-display";
 
 const TYPE_LABEL: Record<ProductType, string> = {
   CONTROL_PANEL: "Surgeon Control Panel",
-  IPS: "IPS",
+  IPS: "IPS (legacy)",
   THEATRE_VACUUM_UNIT: "Theatre Vacuum Unit (TVU)",
   BED_HEAD_PANEL: "Bed Head Panel (BHP)",
   WARD_VACUUM_UNIT: "Ward Vacuum Unit (WVU)",
   AREA_ALARM_SYSTEM: "Area Alarm System",
 };
 
+/** Product types users can choose for new submissions (excludes legacy enum values). */
+const CHECK_FORM_PRODUCT_TYPES: ProductType[] = [
+  ProductType.CONTROL_PANEL,
+  ProductType.THEATRE_VACUUM_UNIT,
+  ProductType.BED_HEAD_PANEL,
+  ProductType.WARD_VACUUM_UNIT,
+  ProductType.AREA_ALARM_SYSTEM,
+];
+
 export function QcWorkflow() {
   const [productType, setProductType] = useState<ProductType>(ProductType.CONTROL_PANEL);
-  const [bom, setBom] = useState<{
-    lines: { id: string; partCode: string; description: string; expectedQty: number }[];
-  } | null>(null);
-
   const [qcFields, setQcFields] = useState<{ key: string; type: "checkbox" | "textarea"; label: string }[]>([]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
@@ -50,25 +54,6 @@ export function QcWorkflow() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [finalQr, setFinalQr] = useState<{ uid: string; dataUrl: string } | null>(null);
   const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (
-      productType === ProductType.CONTROL_PANEL ||
-      productType === ProductType.THEATRE_VACUUM_UNIT ||
-      productType === ProductType.BED_HEAD_PANEL
-      || productType === ProductType.WARD_VACUUM_UNIT
-      || productType === ProductType.AREA_ALARM_SYSTEM
-    ) {
-      setBom(null);
-      return;
-    }
-
-    startTransition(async () => {
-      const res = await getBomTemplateAction(productType);
-      if (res.ok && res.bom) setBom(res.bom);
-      else setBom(null);
-    });
-  }, [productType]);
 
   useEffect(() => {
     if (finalQr) return;
@@ -143,23 +128,8 @@ export function QcWorkflow() {
       return;
     }
 
-    startTransition(async () => {
-      const res = await fetch(`/api/qc-form?productType=${encodeURIComponent(String(productType))}`);
-      const json: unknown = await res.json();
-      if (typeof json === "object" && json !== null && (json as { ok?: unknown }).ok === true) {
-        const maybeFields = (json as { fields?: unknown }).fields;
-        const fields = Array.isArray(maybeFields)
-          ? (maybeFields as { key: string; type: "checkbox" | "textarea"; label: string }[])
-          : [];
-        setQcFields(fields);
-        const nextChecks: Record<string, boolean> = {};
-        for (const f of fields) if (f.type === "checkbox") nextChecks[f.key] = false;
-        setChecks(nextChecks);
-      } else {
-        setQcFields([]);
-        setChecks({});
-      }
-    });
+    setQcFields([]);
+    setChecks({});
   }, [productType, finalQr]);
 
   const checkboxKeys = useMemo(() => qcFields.filter((f) => f.type === "checkbox").map((f) => f.key), [qcFields]);
@@ -194,7 +164,7 @@ export function QcWorkflow() {
     const fd = new FormData();
     fd.set("productType", productType);
     fd.set("inspectorNotes", notes);
-    fd.set("bomChecks", JSON.stringify(checks));
+    fd.set("checklist", JSON.stringify(checks));
     for (const f of files) fd.append("images", f);
 
     startTransition(async () => {
@@ -213,7 +183,7 @@ export function QcWorkflow() {
       <Card>
         <CardHeader>
           <CardTitle>1. Product type</CardTitle>
-          <CardDescription>Choose the assembly type. The checklist and BOM reference update automatically.</CardDescription>
+          <CardDescription>Choose the assembly type. The checklist in step 2 updates for the selected type.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="max-w-xs space-y-2">
@@ -227,7 +197,7 @@ export function QcWorkflow() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(TYPE_LABEL) as ProductType[]).map((k) => (
+                {CHECK_FORM_PRODUCT_TYPES.map((k) => (
                   <SelectItem key={k} value={k}>
                     {TYPE_LABEL[k]}
                   </SelectItem>
@@ -235,40 +205,9 @@ export function QcWorkflow() {
               </SelectContent>
             </Select>
           </div>
-          {productType === ProductType.THEATRE_VACUUM_UNIT ? (
-            <p className="text-sm text-muted-foreground">
-              TVU does not use the BOM section. The finished-goods test report checklist is shown below.
-            </p>
-          ) : productType === ProductType.CONTROL_PANEL ? (
-            <p className="text-sm text-muted-foreground">
-              Surgeon Control Panel uses the finished-goods test report checklist below.
-            </p>
-          ) : productType === ProductType.BED_HEAD_PANEL ? (
-            <p className="text-sm text-muted-foreground">
-              BHP does not use the BOM section. The finished-goods test report checklist is shown below.
-            </p>
-          ) : bom?.lines?.length ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Part</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Expected qty</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bom.lines.map((line) => (
-                  <TableRow key={line.id}>
-                    <TableCell className="font-mono">{line.partCode}</TableCell>
-                    <TableCell>{line.description}</TableCell>
-                    <TableCell className="text-right">{line.expectedQty}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-sm text-muted-foreground">{bom ? "No BOM configured for this type." : "Loading BOM…"}</p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Use step 2 to complete the finished-goods checklist for this product type.
+          </p>
         </CardContent>
       </Card>
 
@@ -297,7 +236,9 @@ export function QcWorkflow() {
                     {computedResult.toUpperCase()}
                   </span>
                 </p>
-                {!hasChecklist && <p className="mt-1 text-xs text-muted-foreground">Select the type again when BOM/checklist is configured.</p>}
+                {!hasChecklist && (
+                  <p className="mt-1 text-xs text-muted-foreground">Select a product type to load its checklist.</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -750,25 +691,7 @@ export function QcWorkflow() {
                       </table>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {qcFields
-                      .filter((f) => f.type === "checkbox")
-                      .map((f) => (
-                        <label key={f.key} className="flex items-start gap-2 rounded-md border p-3">
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={checks[f.key] === true}
-                            onChange={(e) => setChecks((prev) => ({ ...prev, [f.key]: e.target.checked }))}
-                          />
-                          <span className="text-sm">{f.label}</span>
-                        </label>
-                      ))}
-
-                    {!hasChecklist && <p className="text-sm text-muted-foreground">No checklist configured yet for this type.</p>}
-                  </div>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-2">

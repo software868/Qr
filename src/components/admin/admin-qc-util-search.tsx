@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-const VIEW_STORAGE_KEY = "admin-qc-util-view";
+const VIEW_STORAGE_KEY = "admin-check-form-view";
 
 type ViewMode = "table" | "cards";
 
@@ -27,7 +27,7 @@ type EntryRow = {
   id: string;
   entryUid: string;
   productType: string;
-  createdAt: Date;
+  createdAt: string;
   performedBy: { name: string; email: string };
 };
 
@@ -39,8 +39,13 @@ function submittedByLabel(e: EntryRow): string {
   return `${e.performedBy.name} (${e.performedBy.email})`;
 }
 
-function formatWhen(d: Date) {
-  return new Date(d).toLocaleString();
+function formatWhen(iso: string) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+function entryHref(entryUid: string) {
+  return `/admin/entry/${encodeURIComponent(entryUid)}`;
 }
 
 export function AdminQcUtilSearch() {
@@ -73,7 +78,7 @@ export function AdminQcUtilSearch() {
   const loadAll = useCallback(() => {
     startTransition(async () => {
       const res = await getAllQcUtilEntriesAction();
-      if (res.ok) setEntries(res.entries as EntryRow[]);
+      if (res.ok) setEntries(res.entries);
       else setEntries([]);
     });
   }, []);
@@ -81,7 +86,7 @@ export function AdminQcUtilSearch() {
   const runSearch = useCallback((query: string) => {
     startTransition(async () => {
       const res = await searchQcUtilEntriesAction(query);
-      if (res.ok) setEntries(res.entries as EntryRow[]);
+      if (res.ok) setEntries(res.entries);
       else setEntries([]);
     });
   }, []);
@@ -99,9 +104,9 @@ export function AdminQcUtilSearch() {
     return () => clearTimeout(t);
   }, [q, runSearch, loadAll]);
 
-  const goToEntry = useCallback(
+  const openEntry = useCallback(
     (entryUid: string) => {
-      router.push(`/admin/entry/${encodeURIComponent(entryUid)}`);
+      router.push(entryHref(entryUid));
     },
     [router],
   );
@@ -167,7 +172,7 @@ export function AdminQcUtilSearch() {
 
       {!pending && entries && entries.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          {q.trim().length > 0 ? "No entries match your search." : "No Q-Util submissions yet."}
+          {q.trim().length > 0 ? "No entries match your search." : "No check form submissions yet."}
         </p>
       )}
 
@@ -178,7 +183,7 @@ export function AdminQcUtilSearch() {
               <button
                 key={e.id}
                 type="button"
-                onClick={() => goToEntry(e.entryUid)}
+                onClick={() => openEntry(e.entryUid)}
                 className="w-full rounded-lg border bg-card p-3 text-left text-sm transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="font-mono text-xs font-medium break-all">{e.entryUid}</span>
@@ -194,7 +199,7 @@ export function AdminQcUtilSearch() {
                   <span className="text-muted-foreground">By: </span>
                   {submittedByLabel(e)}
                 </p>
-                <p className="mt-1 text-xs text-primary">Tap for full details →</p>
+                <p className="mt-1 text-xs text-primary">Tap to open full details →</p>
               </button>
             ))}
           </div>
@@ -216,11 +221,11 @@ export function AdminQcUtilSearch() {
                     className="cursor-pointer hover:bg-muted/50"
                     tabIndex={0}
                     role="link"
-                    onClick={() => goToEntry(e.entryUid)}
+                    onClick={() => openEntry(e.entryUid)}
                     onKeyDown={(ev) => {
                       if (ev.key === "Enter" || ev.key === " ") {
                         ev.preventDefault();
-                        goToEntry(e.entryUid);
+                        openEntry(e.entryUid);
                       }
                     }}
                   >
@@ -243,7 +248,7 @@ export function AdminQcUtilSearch() {
       {!pending && entries && entries.length > 0 && viewMode === "cards" && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {entries.map((e) => (
-            <Link key={e.id} href={`/admin/entry/${encodeURIComponent(e.entryUid)}`}>
+            <Link key={e.id} href={entryHref(e.entryUid)} className="block h-full">
               <Card className="h-full transition-colors hover:bg-accent/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="break-all font-mono text-base">{e.entryUid}</CardTitle>
@@ -256,6 +261,7 @@ export function AdminQcUtilSearch() {
                     <span className="font-medium">{e.performedBy.name}</span>
                     <span className="text-muted-foreground"> ({e.performedBy.email})</span>
                   </p>
+                  <p className="pt-2 text-xs text-primary">Open full details →</p>
                 </CardContent>
               </Card>
             </Link>

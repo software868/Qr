@@ -19,7 +19,7 @@ export function ExportCsvButton() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `q-util-entries-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `check-form-entries-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Download started");

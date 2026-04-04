@@ -22,7 +22,7 @@ export function DashboardShell({
       <aside className="border-b bg-card md:w-56 md:border-b-0 md:border-r">
         <div className="flex h-14 items-center border-b px-4 md:h-16">
           <Link href="/" className="font-semibold tracking-tight">
-            Q-Util
+            Check form
           </Link>
         </div>
         <nav className="flex gap-1 overflow-x-auto p-2 md:flex-col md:overflow-visible">

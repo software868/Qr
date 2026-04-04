@@ -113,7 +113,7 @@ function LoginForm() {
           </Link>
           {" · "}
           <Link href="/register/qc" className="underline underline-offset-4">
-            QC
+            Check form
           </Link>
           {" · "}
           <Link href="/register" className="underline underline-offset-4">

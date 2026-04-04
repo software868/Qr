@@ -22,6 +22,7 @@ enum ProductStatus {
 
 enum ProductType {
   CONTROL_PANEL
+  /// Present only so legacy MongoDB rows still deserialize; not offered in the check form.
   IPS
   THEATRE_VACUUM_UNIT
   BED_HEAD_PANEL
@@ -63,27 +64,6 @@ model Product {
   @@index([createdById])
 }
 
-model BomTemplate {
-  id          String           @id @default(auto()) @map("_id") @db.ObjectId
-  productType ProductType      @unique
-  name        String
-  lines       BomTemplateLine[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-}
-
-model BomTemplateLine {
-  id          String      @id @default(auto()) @map("_id") @db.ObjectId
-  templateId  String      @db.ObjectId
-  template    BomTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  sortOrder   Int
-  partCode    String
-  description String
-  expectedQty Int         @default(1)
-
-  @@index([templateId])
-}
-
 model QcRecord {
   id               String      @id @default(auto()) @map("_id") @db.ObjectId
   productId        String      @unique @db.ObjectId
@@ -114,7 +94,7 @@ model QcImage {
   @@index([qcRecordId])
 }
 
-/** Standalone Q-Util Check submission (no manufacturing Product row). */
+/** Standalone check form submission (no manufacturing Product row). */
 model QcUtilEntry {
   id            String      @id @default(auto()) @map("_id") @db.ObjectId
   entryUid      String      @unique

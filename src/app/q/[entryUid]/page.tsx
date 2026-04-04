@@ -17,7 +17,7 @@ export default async function PublicQcUtilEntryPage({ params }: { params: Promis
       <Card>
         <CardHeader>
           <CardTitle className="font-mono text-xl">{entry.entryUid}</CardTitle>
-          <CardDescription>Q-Util Check entry (read-only)</CardDescription>
+          <CardDescription>Check form entry (read-only)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div>

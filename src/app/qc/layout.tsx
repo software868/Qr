@@ -17,12 +17,12 @@ export default async function QcLayout({ children }: { children: React.ReactNode
     session.user.role === "ADMIN"
       ? [
           { href: "/admin", label: "Admin" },
-          { href: "/qc", label: "Q-Util Check" },
+          { href: "/qc", label: "Check form" },
         ]
-      : [{ href: "/qc", label: "Q-Util Check" }];
+      : [{ href: "/qc", label: "Check form" }];
 
   return (
-    <DashboardShell title="Q-Util Check" nav={nav}>
+    <DashboardShell title="Check form" nav={nav}>
       {children}
     </DashboardShell>
   );
