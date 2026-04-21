@@ -22,9 +22,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { CameraCaptureButton } from "@/components/qc/camera-capture";
 import { QrDisplay } from "@/components/qr/qr-display";
+
+type BedHeadPanelBomRow = {
+  sr: number;
+  componentName: string;
+  sizeMm: string;
+  qaGrnNo: string;
+  qtyInOnePcs: string;
+  qtyRequired: string;
+  unit: string;
+  issuedFullLength3660: string;
+  remark: string;
+};
+
+const BED_HEAD_PANEL_BOM: BedHeadPanelBomRow[] = [
+  {
+    sr: 1,
+    componentName: "Alum. Profile for BHP (Matco-92)",
+    sizeMm: "3660",
+    qaGrnNo: "Opening Stock",
+    qtyInOnePcs: "1200 mm",
+    qtyRequired: "90",
+    unit: "Nos",
+    issuedFullLength3660: "30",
+    remark: "",
+  },
+  { sr: 2, componentName: "Alum. Profile for BHP (Matco-93)", sizeMm: "3660", qaGrnNo: "''", qtyInOnePcs: "2400 mm", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "60", remark: "" },
+  { sr: 3, componentName: "Alum. Profile for BHP (Matco-94)", sizeMm: "3660", qaGrnNo: "''", qtyInOnePcs: "3600 mm", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "90", remark: "" },
+  { sr: 4, componentName: "SS Pipe 20x10x18 G", sizeMm: "6096", qaGrnNo: "''", qtyInOnePcs: "900 mm", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "14", remark: "20 Feet Long" },
+  { sr: 5, componentName: "SS Pipe 3/8\" x 18 G", sizeMm: "6096", qaGrnNo: "''", qtyInOnePcs: "-", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "2", remark: "20 Feet Long" },
+  { sr: 6, componentName: "Electric Switch 15 A", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "7", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "630", remark: "" },
+  { sr: 7, componentName: "Electric Socket 05/15 A", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "6", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "540", remark: "" },
+  { sr: 8, componentName: "Blanking Plate 1 Module", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "4", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "360", remark: "" },
+  { sr: 9, componentName: "Surround Plate 2 Module", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "3", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "270", remark: "" },
+  { sr: 10, componentName: "Surround Plate 3 Module", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "2", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "180", remark: "" },
+  { sr: 11, componentName: "Surround Plate 6 Module", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "2", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "180", remark: "" },
+  { sr: 12, componentName: "RJ-45 Socket", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "1", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "90", remark: "" },
+  { sr: 13, componentName: "Corrugated Box 5 Ply", sizeMm: "", qaGrnNo: "''", qtyInOnePcs: "1", qtyRequired: "90", unit: "Nos", issuedFullLength3660: "90", remark: "" },
+];
 
 const TYPE_LABEL: Record<ProductType, string> = {
   CONTROL_PANEL: "Surgeon Control Panel",
@@ -208,6 +247,43 @@ export function QcWorkflow() {
           <p className="text-sm text-muted-foreground">
             Use step 2 to complete the finished-goods checklist for this product type.
           </p>
+          {productType === ProductType.BED_HEAD_PANEL ? (
+            <div className="space-y-2 pt-3">
+              <p className="text-sm font-semibold">Bill of Material (Bed Head Panel)</p>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[70px]">S. No.</TableHead>
+                      <TableHead className="min-w-[280px]">Component name</TableHead>
+                      <TableHead className="w-[110px]">Size (mm)</TableHead>
+                      <TableHead className="w-[140px]">QA/GRN No.</TableHead>
+                      <TableHead className="w-[130px]">Qty. in one (pcs)</TableHead>
+                      <TableHead className="w-[120px]">Qty. required</TableHead>
+                      <TableHead className="w-[90px]">Unit</TableHead>
+                      <TableHead className="w-[170px]">Issued full length (3660 mm)</TableHead>
+                      <TableHead className="min-w-[160px]">Remark</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {BED_HEAD_PANEL_BOM.map((r) => (
+                      <TableRow key={r.sr}>
+                        <TableCell>{r.sr}</TableCell>
+                        <TableCell className="font-medium">{r.componentName}</TableCell>
+                        <TableCell>{r.sizeMm || "—"}</TableCell>
+                        <TableCell>{r.qaGrnNo || "—"}</TableCell>
+                        <TableCell>{r.qtyInOnePcs || "—"}</TableCell>
+                        <TableCell>{r.qtyRequired || "—"}</TableCell>
+                        <TableCell>{r.unit || "—"}</TableCell>
+                        <TableCell>{r.issuedFullLength3660 || "—"}</TableCell>
+                        <TableCell>{r.remark || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

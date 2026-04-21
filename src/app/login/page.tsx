@@ -108,16 +108,8 @@ function LoginForm() {
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           New user?{" "}
-          <Link href="/register/qr" className="underline underline-offset-4">
-            QR Generator
-          </Link>
-          {" · "}
           <Link href="/register/qc" className="underline underline-offset-4">
-            Check form
-          </Link>
-          {" · "}
-          <Link href="/register" className="underline underline-offset-4">
-            Admin (first setup)
+            Sign up
           </Link>
         </p>
       </CardContent>
