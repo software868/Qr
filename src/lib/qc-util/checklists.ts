@@ -223,6 +223,12 @@ export function getExpectedChecklistKeys(productType: ProductType): string[] {
   switch (productType) {
     case "IPS":
       return [];
+    case "ISOLATION_VALVE":
+      return [];
+    case "AREA_VALVE_SERVICE_UNIT":
+      return [];
+    case "OT_LIGHT":
+      return [];
     case "CONTROL_PANEL":
       return CONTROL_PANEL_CHECKLIST_ROWS.map((r) => r.key);
     case "THEATRE_VACUUM_UNIT":
