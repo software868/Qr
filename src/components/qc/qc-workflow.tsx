@@ -10,6 +10,10 @@ import {
   CONTROL_PANEL_CHECKLIST_ROWS,
   WVU_CHECKLIST_ROWS,
   AAS_CHECKLIST_ROWS,
+  MGTU_OUTLET_POINT_CHECKLIST_ROWS,
+  OT_LIGHT_CHECKLIST_ROWS,
+  AREA_VALVE_SERVICE_UNIT_CHECKLIST_ROWS,
+  ISOLATION_VALVE_CHECKLIST_ROWS,
 } from "@/lib/qc-util/checklists";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +37,7 @@ const TYPE_LABEL: Record<ProductType, string> = {
   BED_HEAD_PANEL: "Bed Head Panel (BHP)",
   WARD_VACUUM_UNIT: "Ward Vacuum Unit (WVU)",
   AREA_ALARM_SYSTEM: "Area Alarm System",
+  MEDICAL_GAS_TERMINAL_UNIT_OUTLET_POINT: "Medical Gas Terminal Unit (Outlet Point)",
   ISOLATION_VALVE: "Isolation Valve",
   AREA_VALVE_SERVICE_UNIT: "Area Valve Service Unit",
   OT_LIGHT: "OT Light",
@@ -45,6 +50,7 @@ const CHECK_FORM_PRODUCT_TYPES: ProductType[] = [
   ProductType.BED_HEAD_PANEL,
   ProductType.WARD_VACUUM_UNIT,
   ProductType.AREA_ALARM_SYSTEM,
+  ProductType.MEDICAL_GAS_TERMINAL_UNIT_OUTLET_POINT,
   ProductType.ISOLATION_VALVE,
   ProductType.AREA_VALVE_SERVICE_UNIT,
   ProductType.OT_LIGHT,
@@ -102,6 +108,62 @@ export function QcWorkflow() {
 
       const nextChecks: Record<string, boolean> = {};
       for (const f of aasFields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.MEDICAL_GAS_TERMINAL_UNIT_OUTLET_POINT) {
+      const fields = MGTU_OUTLET_POINT_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(fields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of fields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.OT_LIGHT) {
+      const fields = OT_LIGHT_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(fields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of fields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.AREA_VALVE_SERVICE_UNIT) {
+      const fields = AREA_VALVE_SERVICE_UNIT_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(fields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of fields) nextChecks[f.key] = false;
+      setChecks(nextChecks);
+      return;
+    }
+
+    if (productType === ProductType.ISOLATION_VALVE) {
+      const fields = ISOLATION_VALVE_CHECKLIST_ROWS.map((r) => ({
+        key: r.key,
+        type: "checkbox" as const,
+        label: r.test,
+      }));
+      setQcFields(fields);
+
+      const nextChecks: Record<string, boolean> = {};
+      for (const f of fields) nextChecks[f.key] = false;
       setChecks(nextChecks);
       return;
     }
@@ -339,7 +401,7 @@ export function QcWorkflow() {
                           </tr>
 
                           {/* Physical test sub-items */}
-                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(0, 5).map((row) => (
+                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(0, 13).map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2 text-sm" />
                               <td className="border p-2 text-sm">{row.test}</td>
@@ -367,7 +429,7 @@ export function QcWorkflow() {
                           </tr>
 
                           {/* Micro-biological */}
-                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(5, 6).map((row) => (
+                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(13, 14).map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2 text-sm">2</td>
                               <td className="border p-2 text-sm">
@@ -397,7 +459,7 @@ export function QcWorkflow() {
                           </tr>
 
                           {/* Biological */}
-                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(6, 7).map((row) => (
+                          {CONTROL_PANEL_CHECKLIST_ROWS.slice(14, 15).map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2 text-sm">3</td>
                               <td className="border p-2 text-sm">
@@ -467,7 +529,7 @@ export function QcWorkflow() {
                             <td className="border p-2" />
                           </tr>
 
-                          {WVU_CHECKLIST_ROWS.slice(0, 5).map((row) => (
+                          {WVU_CHECKLIST_ROWS.slice(0, 6).map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
@@ -496,7 +558,7 @@ export function QcWorkflow() {
                           </tr>
 
                           {/* Jar Cap Material */}
-                          {WVU_CHECKLIST_ROWS.slice(5, 6).map((row) => (
+                          {WVU_CHECKLIST_ROWS.slice(6, 7).map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
@@ -525,8 +587,8 @@ export function QcWorkflow() {
                             <td className="border p-2" />
                           </tr>
 
-                          {/* Fixture sub items: indexes 6..13 */}
-                          {WVU_CHECKLIST_ROWS.slice(6, 14).map((row) => (
+                          {/* Fixture sub items */}
+                          {WVU_CHECKLIST_ROWS.slice(7, 15).map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
@@ -549,16 +611,16 @@ export function QcWorkflow() {
                             <td className="border p-2 text-sm">
                               <b>Leakage</b>
                             </td>
-                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[14].specification}</td>
-                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[14].observation}</td>
+                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[15].specification}</td>
+                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[15].observation}</td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
-                                checked={checks[WVU_CHECKLIST_ROWS[14].key] === true}
+                                checked={checks[WVU_CHECKLIST_ROWS[15].key] === true}
                                 onChange={(e) =>
                                   setChecks((prev) => ({
                                     ...prev,
-                                    [WVU_CHECKLIST_ROWS[14].key]: e.target.checked,
+                                    [WVU_CHECKLIST_ROWS[15].key]: e.target.checked,
                                   }))
                                 }
                               />
@@ -609,6 +671,402 @@ export function QcWorkflow() {
                           {AAS_CHECKLIST_ROWS.map((row) => (
                             <tr key={row.key}>
                               <td className="border p-2 text-sm" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.MEDICAL_GAS_TERMINAL_UNIT_OUTLET_POINT ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm">
+                              <b>Medical Gas Terminal Unit</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          <tr>
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm" rowSpan={3}>
+                              Finishing
+                            </td>
+                            <td className="border p-2 text-sm">Smoothness</td>
+                            <td className="border p-2 text-sm">Smooth</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks["mgtu:finishing-smoothness"] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({
+                                    ...prev,
+                                    ["mgtu:finishing-smoothness"]: e.target.checked,
+                                  }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm">Brazing</td>
+                            <td className="border p-2 text-sm">Copper Pipe Brazed</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks["mgtu:finishing-brazing"] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({
+                                    ...prev,
+                                    ["mgtu:finishing-brazing"]: e.target.checked,
+                                  }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm">Cleaning</td>
+                            <td className="border p-2 text-sm">Clean</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks["mgtu:finishing-cleaning"] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({
+                                    ...prev,
+                                    ["mgtu:finishing-cleaning"]: e.target.checked,
+                                  }))
+                                }
+                              />
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm">Probe Lock/ Unlock</td>
+                            <td className="border p-2 text-sm">Looking and Unlocking Smooth</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks["mgtu:probe-lock-unlock"] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({
+                                    ...prev,
+                                    ["mgtu:probe-lock-unlock"]: e.target.checked,
+                                  }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.OT_LIGHT ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm" rowSpan={2}>
+                              Illumination Level
+                            </td>
+                            <td className="border p-2 text-sm">
+                              <div className="font-medium">Major Dome</div>
+                              <div className="text-muted-foreground">{OT_LIGHT_CHECKLIST_ROWS[0].specification}</div>
+                            </td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[0].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[0].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[0].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm">
+                              <div className="font-medium">Minor Dome</div>
+                              <div className="text-muted-foreground">{OT_LIGHT_CHECKLIST_ROWS[1].specification}</div>
+                            </td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[1].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[1].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[1].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="border p-2 text-sm">2</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[2].test}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[2].specification}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[2].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[2].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[2].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm">3</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[3].test}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[3].specification}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[3].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[3].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[3].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm">4</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[4].test}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[4].specification}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[4].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[4].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[4].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm">5</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[5].test}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[5].specification}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[5].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[5].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[5].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm" />
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[6].specification}</td>
+                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[6].observation}</td>
+                            <td className="border p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checks[OT_LIGHT_CHECKLIST_ROWS[6].key] === true}
+                                onChange={(e) =>
+                                  setChecks((prev) => ({ ...prev, [OT_LIGHT_CHECKLIST_ROWS[6].key]: e.target.checked }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.AREA_VALVE_SERVICE_UNIT ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border p-2 text-sm">1</td>
+                            <td className="border p-2 text-sm">
+                              <b>Area Valve Service Unit</b>
+                            </td>
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                            <td className="border p-2" />
+                          </tr>
+
+                          {AREA_VALVE_SERVICE_UNIT_CHECKLIST_ROWS.map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm" />
+                              <td className="border p-2 text-sm">{row.test}</td>
+                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={checks[row.key] === true}
+                                  onChange={(e) =>
+                                    setChecks((prev) => ({
+                                      ...prev,
+                                      [row.key]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : productType === ProductType.ISOLATION_VALVE ? (
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold">Finished Goods Test Report</h3>
+                    <h4 className="text-sm">
+                      Result:{" "}
+                      <span
+                        className={
+                          computedResult === "pass"
+                            ? "font-semibold text-green-600"
+                            : "font-semibold text-red-600"
+                        }
+                      >
+                        {computedResult.toUpperCase()}
+                      </span>
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border">
+                        <thead>
+                          <tr className="bg-muted/30">
+                            <th className="border p-2 text-left text-xs">Sr. No.</th>
+                            <th className="border p-2 text-left text-xs">TESTS</th>
+                            <th className="border p-2 text-left text-xs">SPECIFICATION</th>
+                            <th className="border p-2 text-left text-xs">OBSERVATION</th>
+                            <th className="border p-2 text-left text-xs">RESULT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={5} className="border p-2">
+                              <b>(A) PHYSICAL TEST</b>
+                            </td>
+                          </tr>
+
+                          {ISOLATION_VALVE_CHECKLIST_ROWS.map((row) => (
+                            <tr key={row.key}>
+                              <td className="border p-2 text-sm">{row.srNo}</td>
                               <td className="border p-2 text-sm">{row.test}</td>
                               <td className="border p-2 text-sm">{row.specification}</td>
                               <td className="border p-2 text-sm">{row.observation}</td>
