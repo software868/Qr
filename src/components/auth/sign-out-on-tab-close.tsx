@@ -36,6 +36,10 @@ export function SignOutOnTabClose() {
     const interval = window.setInterval(refreshCsrf, 10 * 60 * 1000);
     const onFocus = () => refreshCsrf();
     window.addEventListener("focus", onFocus);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshCsrf();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -65,16 +69,22 @@ export function SignOutOnTabClose() {
 
       const callbackUrl = `${window.location.origin}/login`;
       const body = new URLSearchParams({ csrfToken: token, callbackUrl });
-      void fetch(`${AUTH_BASE}/signout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Auth-Return-Redirect": "1",
-        },
-        body,
-        keepalive: true,
-        credentials: "include",
-      });
+      const url = `${AUTH_BASE}/signout`;
+
+      // Prefer sendBeacon on unload; fall back to fetch keepalive.
+      // Note: we intentionally omit X-Auth-Return-Redirect here — we don't want redirects during unload.
+      const ok = navigator.sendBeacon?.(url, body);
+      if (!ok) {
+        void fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body,
+          keepalive: true,
+          credentials: "include",
+        });
+      }
     };
 
     window.addEventListener("pagehide", onPageHide);
@@ -82,6 +92,7 @@ export function SignOutOnTabClose() {
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("pagehide", onPageHide);
     };
