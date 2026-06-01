@@ -27,6 +27,30 @@ const qcUtilSubmitSchema = z.object({
     .optional(),
 });
 
+function submissionErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+
+  if (
+    lower.includes("dns") ||
+    lower.includes("name resolution") ||
+    lower.includes("querysrv") ||
+    lower.includes("unreachable network")
+  ) {
+    return "Database connection failed. Please check internet/DNS and MongoDB Atlas network access.";
+  }
+
+  if (lower.includes("authentication failed") || lower.includes("bad auth")) {
+    return "Database login failed. Please check the MongoDB username and password in .env.";
+  }
+
+  if (lower.includes("cloudinary") || lower.includes("api_key") || lower.includes("api_secret")) {
+    return "Image upload failed. Please check the Cloudinary settings in .env.";
+  }
+
+  return message || "Submission failed";
+}
+
 export async function submitQcUtilFormAction(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Unauthorized" };
@@ -107,9 +131,12 @@ export async function submitQcUtilFormAction(formData: FormData) {
       ok: true as const,
       entryUid: result.entryUid,
       qrDataUrl: result.qrDataUrl,
+      warning:
+        result.uploadErrors.length > 0
+          ? "Saved and generated QR, but one or more photos could not be uploaded."
+          : undefined,
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Submission failed";
-    return { ok: false as const, error: msg };
+    return { ok: false as const, error: submissionErrorMessage(e) };
   }
 }

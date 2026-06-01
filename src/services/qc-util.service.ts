@@ -16,11 +16,6 @@ export async function createQcUtilSubmission(input: {
     entryUid = generateQcUtilEntryUid();
   }
 
-  const uploaded: { url: string; publicId: string }[] = [];
-  for (const img of input.images) {
-    uploaded.push(await uploadQcImageBuffer(img.buffer, img.mimeType));
-  }
-
   const entry = await prisma.qcUtilEntry.create({
     data: {
       entryUid,
@@ -29,6 +24,16 @@ export async function createQcUtilSubmission(input: {
       performedById: input.performedById,
     },
   });
+
+  const uploaded: { url: string; publicId: string }[] = [];
+  const uploadErrors: string[] = [];
+  for (const img of input.images) {
+    try {
+      uploaded.push(await uploadQcImageBuffer(img.buffer, img.mimeType));
+    } catch (error) {
+      uploadErrors.push(error instanceof Error ? error.message : "Image upload failed");
+    }
+  }
 
   let order = 0;
   for (const u of uploaded) {
@@ -46,5 +51,5 @@ export async function createQcUtilSubmission(input: {
   const payload = base ? `${base}/q/${entry.entryUid}` : entry.entryUid;
   const qrDataUrl = await qrDataUrlForPayload(payload);
 
-  return { entryId: entry.id, entryUid: entry.entryUid, qrDataUrl };
+  return { entryId: entry.id, entryUid: entry.entryUid, qrDataUrl, uploadErrors };
 }

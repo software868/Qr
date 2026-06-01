@@ -300,7 +300,11 @@ export function QcWorkflow() {
       const res = await submitQcUtilFormAction(fd);
       if (res.ok) {
         setFinalQr({ uid: res.entryUid, dataUrl: res.qrDataUrl });
-        toast.success("Saved. Your entry UID and QR are ready.");
+        if ("warning" in res && res.warning) {
+          toast.warning(res.warning);
+        } else {
+          toast.success("Saved. Your entry UID and QR are ready.");
+        }
         return;
       }
       toast.error("error" in res ? res.error : "Failed");
