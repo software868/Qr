@@ -10,8 +10,21 @@ import type { Prisma } from "@prisma/client";
 
 const qcUtilSubmitSchema = z.object({
   productType: z.nativeEnum(ProductType),
+  lotNumber: z.string().trim().min(1).max(120),
   inspectorNotes: z.string().trim().max(5000).optional(),
   checklist: z.record(z.string(), z.boolean()).optional(),
+  checklistRows: z
+    .array(
+      z.object({
+        key: z.string().max(200),
+        label: z.string().max(1000).optional(),
+        specification: z.string().max(5000).optional(),
+        observation: z.string().max(5000).optional(),
+        checked: z.boolean().optional(),
+        custom: z.boolean().optional(),
+      }),
+    )
+    .optional(),
 });
 
 export async function submitQcUtilFormAction(formData: FormData) {
@@ -29,10 +42,20 @@ export async function submitQcUtilFormAction(formData: FormData) {
     return { ok: false as const, error: "Invalid checklist data" };
   }
 
+  let checklistRows: unknown[] = [];
+  try {
+    const raw = formData.get("checklistRows");
+    if (raw) checklistRows = JSON.parse(String(raw)) as unknown[];
+  } catch {
+    return { ok: false as const, error: "Invalid checklist row data" };
+  }
+
   const parsed = qcUtilSubmitSchema.safeParse({
     productType: formData.get("productType"),
+    lotNumber: formData.get("lotNumber"),
     inspectorNotes: formData.get("inspectorNotes") ?? "",
     checklist,
+    checklistRows,
   });
   if (!parsed.success) return { ok: false as const, error: "Invalid form data" };
 
@@ -62,8 +85,10 @@ export async function submitQcUtilFormAction(formData: FormData) {
 
   const storedForm: Prisma.InputJsonValue = {
     passStatus: "pass",
+    lotNumber: parsed.data.lotNumber,
     inspectorNotes: parsed.data.inspectorNotes ?? "",
     checklist: checks,
+    checklistRows: parsed.data.checklistRows ?? [],
   };
 
   try {

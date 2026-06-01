@@ -8,6 +8,15 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { labelForChecklistKey } from "@/lib/qc-util/checklists";
 
+type SubmittedChecklistRow = {
+  key: string;
+  label?: string;
+  specification?: string;
+  observation?: string;
+  checked?: boolean;
+  custom?: boolean;
+};
+
 export type AdminQcUtilEntryViewData = {
   entryUid: string;
   productType: string;
@@ -15,8 +24,10 @@ export type AdminQcUtilEntryViewData = {
   performedBy: { name: string; email: string };
   formData: {
     passStatus?: string;
+    lotNumber?: string;
     inspectorNotes?: string;
     checklist?: Record<string, boolean>;
+    checklistRows?: SubmittedChecklistRow[];
     /** Older submissions only */
     bomChecks?: Record<string, boolean>;
   } | null;
@@ -46,16 +57,28 @@ function storedChecklist(fd: AdminQcUtilEntryViewData["formData"]): Record<strin
   return raw && typeof raw === "object" ? raw : {};
 }
 
+function storedChecklistRows(fd: AdminQcUtilEntryViewData["formData"]): SubmittedChecklistRow[] {
+  if (!Array.isArray(fd?.checklistRows)) return [];
+  return fd.checklistRows.filter((row) => row && typeof row.key === "string");
+}
+
 function buildPrintableHtml(data: AdminQcUtilEntryViewData): string {
   const fd = data.formData;
   const checklist = storedChecklist(fd);
-  const rows = Object.entries(checklist)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(
-    ([k, v]) =>
-      `<tr><td>${escapeHtml(labelForChecklistKey(k))}</td><td>${v ? "Yes" : "No"}</td></tr>`,
-  );
+  const submittedRows = storedChecklistRows(fd);
+  const rows = submittedRows.length > 0
+    ? submittedRows.map(
+        (row) =>
+          `<tr><td>${escapeHtml(row.label || labelForChecklistKey(row.key))}</td><td>${escapeHtml(row.specification ?? "")}</td><td>${escapeHtml(row.observation ?? "")}</td><td>${row.checked ? "Yes" : "No"}</td></tr>`,
+      )
+    : Object.entries(checklist)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(
+          ([k, v]) =>
+            `<tr><td>${escapeHtml(labelForChecklistKey(k))}</td><td></td><td></td><td>${v ? "Yes" : "No"}</td></tr>`,
+        );
   const notes = escapeHtml((fd?.inspectorNotes ?? "").trim() || "—");
+  const lotNumber = escapeHtml((fd?.lotNumber ?? "").trim() || "—");
   const imgs = data.images
     .map(
       (img) =>
@@ -77,12 +100,13 @@ th{background:#f4f4f4}
 <div class="meta">
 <div><strong>Entry UID:</strong> ${escapeHtml(data.entryUid)}</div>
 <div><strong>Product type:</strong> ${escapeHtml(typeLabel(data.productType))}</div>
+<div><strong>Lot number:</strong> ${lotNumber}</div>
 <div><strong>Submitted:</strong> ${escapeHtml(formatDate(data.createdAtIso))}</div>
 <div><strong>Submitted by:</strong> ${escapeHtml(data.performedBy.name)} (${escapeHtml(data.performedBy.email)})</div>
 <div><strong>Result:</strong> ${escapeHtml(fd?.passStatus ?? "—")}</div>
 </div>
 <h2 style="font-size:16px;margin:0 0 8px">Submitted checklist</h2>
-<table><thead><tr><th>Item</th><th>Passed</th></tr></thead><tbody>${
+<table><thead><tr><th>Item</th><th>Specification</th><th>Observation</th><th>Passed</th></tr></thead><tbody>${
     rows.length ? rows.join("") : "<tr><td colspan='2'>No checklist data</td></tr>"
   }</tbody></table>
 <div class="section"><h2 style="font-size:16px;margin:0 0 8px">Notes</h2><p style="white-space:pre-wrap;font-size:13px">${notes}</p></div>
@@ -94,6 +118,7 @@ export function AdminQcUtilEntryView({ data }: { data: AdminQcUtilEntryViewData 
   const router = useRouter();
   const fd = data.formData;
   const checklistEntries = Object.entries(storedChecklist(fd)).sort(([a], [b]) => a.localeCompare(b));
+  const checklistRows = storedChecklistRows(fd);
 
   function printAsPdf() {
     const html = buildPrintableHtml(data);
@@ -139,6 +164,7 @@ export function AdminQcUtilEntryView({ data }: { data: AdminQcUtilEntryViewData 
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <Detail label="Product type" value={typeLabel(data.productType)} />
+            <Detail label="Lot number" value={fd?.lotNumber?.trim() || "—"} />
             <Detail label="Result" value={fd?.passStatus ?? "—"} />
             <Detail label="Submitted by" value={`${data.performedBy.name} (${data.performedBy.email})`} />
           </div>
@@ -147,7 +173,7 @@ export function AdminQcUtilEntryView({ data }: { data: AdminQcUtilEntryViewData 
 
           <div>
             <h3 className="mb-3 text-sm font-semibold">Submitted form (checklist)</h3>
-            {checklistEntries.length === 0 ? (
+            {checklistEntries.length === 0 && checklistRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">No checklist data stored for this entry.</p>
             ) : (
               <div className="overflow-x-auto rounded-md border">
@@ -155,16 +181,29 @@ export function AdminQcUtilEntryView({ data }: { data: AdminQcUtilEntryViewData 
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
+                      <TableHead>Specification</TableHead>
+                      <TableHead>Observation</TableHead>
                       <TableHead className="w-[100px]">Passed</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {checklistEntries.map(([key, passed]) => (
-                      <TableRow key={key}>
-                        <TableCell className="text-sm">{labelForChecklistKey(key)}</TableCell>
-                        <TableCell className="text-sm">{passed ? "Yes" : "No"}</TableCell>
-                      </TableRow>
-                    ))}
+                    {checklistRows.length > 0
+                      ? checklistRows.map((row) => (
+                          <TableRow key={row.key}>
+                            <TableCell className="text-sm">{row.label || labelForChecklistKey(row.key)}</TableCell>
+                            <TableCell className="text-sm">{row.specification || "—"}</TableCell>
+                            <TableCell className="text-sm">{row.observation || "—"}</TableCell>
+                            <TableCell className="text-sm">{row.checked ? "Yes" : "No"}</TableCell>
+                          </TableRow>
+                        ))
+                      : checklistEntries.map(([key, passed]) => (
+                          <TableRow key={key}>
+                            <TableCell className="text-sm">{labelForChecklistKey(key)}</TableCell>
+                            <TableCell className="text-sm">—</TableCell>
+                            <TableCell className="text-sm">—</TableCell>
+                            <TableCell className="text-sm">{passed ? "Yes" : "No"}</TableCell>
+                          </TableRow>
+                        ))}
                   </TableBody>
                 </Table>
               </div>

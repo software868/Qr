@@ -17,6 +17,7 @@ import {
 } from "@/lib/qc-util/checklists";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -56,8 +57,48 @@ const CHECK_FORM_PRODUCT_TYPES: ProductType[] = [
   ProductType.OT_LIGHT,
 ];
 
+type ChecklistRowLike = {
+  key: string;
+  srNo?: number;
+  test: string;
+  specification: string;
+  observation: string;
+};
+
+const CHECKLIST_ROWS_BY_TYPE: Partial<Record<ProductType, ChecklistRowLike[]>> = {
+  [ProductType.CONTROL_PANEL]: CONTROL_PANEL_CHECKLIST_ROWS,
+  [ProductType.THEATRE_VACUUM_UNIT]: TVU_CHECKLIST_ROWS,
+  [ProductType.BED_HEAD_PANEL]: BHP_CHECKLIST_ROWS,
+  [ProductType.WARD_VACUUM_UNIT]: WVU_CHECKLIST_ROWS,
+  [ProductType.AREA_ALARM_SYSTEM]: AAS_CHECKLIST_ROWS,
+  [ProductType.MEDICAL_GAS_TERMINAL_UNIT_OUTLET_POINT]: MGTU_OUTLET_POINT_CHECKLIST_ROWS,
+  [ProductType.ISOLATION_VALVE]: ISOLATION_VALVE_CHECKLIST_ROWS,
+  [ProductType.AREA_VALVE_SERVICE_UNIT]: AREA_VALVE_SERVICE_UNIT_CHECKLIST_ROWS,
+  [ProductType.OT_LIGHT]: OT_LIGHT_CHECKLIST_ROWS,
+};
+
+const CHECKLIST_SECTION_COUNT_BY_TYPE: Partial<Record<ProductType, number>> = {
+  [ProductType.CONTROL_PANEL]: 3,
+  [ProductType.THEATRE_VACUUM_UNIT]: 0,
+  [ProductType.BED_HEAD_PANEL]: 1,
+  [ProductType.WARD_VACUUM_UNIT]: 1,
+  [ProductType.AREA_ALARM_SYSTEM]: 1,
+  [ProductType.MEDICAL_GAS_TERMINAL_UNIT_OUTLET_POINT]: 1,
+  [ProductType.ISOLATION_VALVE]: 1,
+  [ProductType.AREA_VALVE_SERVICE_UNIT]: 1,
+  [ProductType.OT_LIGHT]: 1,
+};
+
+type RowEdit = {
+  specification: string;
+  observation: string;
+};
+
 export function QcWorkflow() {
   const [productType, setProductType] = useState<ProductType>(ProductType.CONTROL_PANEL);
+  const [lotNumber, setLotNumber] = useState("");
+  const [rowEdits, setRowEdits] = useState<Record<string, RowEdit>>({});
+  const [customRowsByType, setCustomRowsByType] = useState<Partial<Record<ProductType, ChecklistRowLike[]>>>({});
   const [qcFields, setQcFields] = useState<{ key: string; type: "checkbox" | "textarea"; label: string }[]>([]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
@@ -200,7 +241,17 @@ export function QcWorkflow() {
     setChecks({});
   }, [productType, finalQr]);
 
-  const checkboxKeys = useMemo(() => qcFields.filter((f) => f.type === "checkbox").map((f) => f.key), [qcFields]);
+  const customRows = useMemo(
+    () => customRowsByType[productType] ?? [],
+    [customRowsByType, productType],
+  );
+  const checkboxKeys = useMemo(
+    () => [
+      ...qcFields.filter((f) => f.type === "checkbox").map((f) => f.key),
+      ...customRows.map((row) => row.key),
+    ],
+    [customRows, qcFields],
+  );
   const hasChecklist = checkboxKeys.length > 0;
 
   const computedResult = useMemo(() => {
@@ -210,6 +261,9 @@ export function QcWorkflow() {
 
   const resetSession = useCallback(() => {
     for (const u of previews) URL.revokeObjectURL(u);
+    setLotNumber("");
+    setRowEdits({});
+    setCustomRowsByType({});
     setNotes("");
     setFiles([]);
     setPreviews([]);
@@ -228,11 +282,18 @@ export function QcWorkflow() {
       toast.error("All checklist items must pass before submission.");
       return;
     }
+    const cleanLotNumber = lotNumber.trim();
+    if (!cleanLotNumber) {
+      toast.error("Please enter the lot number.");
+      return;
+    }
 
     const fd = new FormData();
     fd.set("productType", productType);
+    fd.set("lotNumber", cleanLotNumber);
     fd.set("inspectorNotes", notes);
     fd.set("checklist", JSON.stringify(checks));
+    fd.set("checklistRows", JSON.stringify(buildSubmittedRows()));
     for (const f of files) fd.append("images", f);
 
     startTransition(async () => {
@@ -244,6 +305,160 @@ export function QcWorkflow() {
       }
       toast.error("error" in res ? res.error : "Failed");
     });
+  }
+
+  function rowText(row: ChecklistRowLike, field: keyof RowEdit) {
+    return rowEdits[row.key]?.[field] ?? row[field];
+  }
+
+  function setRowText(row: ChecklistRowLike, field: keyof RowEdit, value: string) {
+    setRowEdits((prev) => ({
+      ...prev,
+      [row.key]: {
+        specification: prev[row.key]?.specification ?? row.specification,
+        observation: prev[row.key]?.observation ?? row.observation,
+        [field]: value,
+      },
+    }));
+  }
+
+  function addCustomRow() {
+    const key = `custom:${productType}:${Date.now()}`;
+    const row: ChecklistRowLike = {
+      key,
+      test: "",
+      specification: "",
+      observation: "",
+    };
+    setCustomRowsByType((prev) => ({
+      ...prev,
+      [productType]: [...(prev[productType] ?? []), row],
+    }));
+    setChecks((prev) => ({ ...prev, [key]: false }));
+  }
+
+  function updateCustomRow(rowKey: string, field: keyof Omit<ChecklistRowLike, "key" | "srNo">, value: string) {
+    setCustomRowsByType((prev) => ({
+      ...prev,
+      [productType]: (prev[productType] ?? []).map((row) =>
+        row.key === rowKey ? { ...row, [field]: value } : row,
+      ),
+    }));
+  }
+
+  function removeCustomRow(rowKey: string) {
+    setCustomRowsByType((prev) => ({
+      ...prev,
+      [productType]: (prev[productType] ?? []).filter((row) => row.key !== rowKey),
+    }));
+    setChecks((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+  }
+
+  function buildSubmittedRows() {
+    const baseRows = (CHECKLIST_ROWS_BY_TYPE[productType] ?? []).map((row) => ({
+      key: row.key,
+      label: row.test,
+      specification: rowText(row, "specification"),
+      observation: rowText(row, "observation"),
+      checked: checks[row.key] === true,
+      custom: false,
+    }));
+    const extraRows = customRows.map((row) => ({
+      key: row.key,
+      label: row.test,
+      specification: row.specification,
+      observation: row.observation,
+      checked: checks[row.key] === true,
+      custom: true,
+    }));
+    return [...baseRows, ...extraRows];
+  }
+
+  function renderEditableCell({
+    row,
+    field,
+    placeholder,
+  }: {
+    row: ChecklistRowLike;
+    field: keyof RowEdit;
+    placeholder?: string;
+  }) {
+    return (
+      <Textarea
+        value={rowText(row, field)}
+        onChange={(e) => setRowText(row, field, e.target.value)}
+        rows={2}
+        placeholder={placeholder}
+        className="min-h-14 resize-y border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+      />
+    );
+  }
+
+  function renderCustomRows() {
+    if (customRows.length === 0) return null;
+    const sectionLetter = String.fromCharCode(65 + (CHECKLIST_SECTION_COUNT_BY_TYPE[productType] ?? 0));
+
+    return (
+      <>
+        <tr>
+          <td colSpan={5} className="border p-2">
+            <b>({sectionLetter}) NEW TEST ADDED BY USER</b>
+          </td>
+        </tr>
+        {customRows.map((row, index) => (
+          <tr key={row.key}>
+            <td className="border p-2 text-sm">{index + 1}</td>
+            <td className="border p-2">
+              <Input
+                value={row.test}
+                onChange={(e) => updateCustomRow(row.key, "test", e.target.value)}
+                placeholder="Test name"
+                className="border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+              />
+            </td>
+            <td className="border p-2">
+              <Textarea
+                value={row.specification}
+                onChange={(e) => updateCustomRow(row.key, "specification", e.target.value)}
+                rows={2}
+                placeholder="Specification"
+                className="min-h-14 resize-y border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+              />
+            </td>
+            <td className="border p-2">
+              <Textarea
+                value={row.observation}
+                onChange={(e) => updateCustomRow(row.key, "observation", e.target.value)}
+                rows={2}
+                placeholder="Observation"
+                className="min-h-14 resize-y border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+              />
+            </td>
+            <td className="border p-2 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={checks[row.key] === true}
+                  onChange={(e) =>
+                    setChecks((prev) => ({
+                      ...prev,
+                      [row.key]: e.target.checked,
+                    }))
+                  }
+                />
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeCustomRow(row.key)}>
+                  Remove
+                </Button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </>
+    );
   }
 
   return (
@@ -272,6 +487,17 @@ export function QcWorkflow() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="max-w-xs space-y-2">
+            <Label htmlFor="lotNumber">Lot number</Label>
+            <Input
+              id="lotNumber"
+              value={lotNumber}
+              onChange={(e) => setLotNumber(e.target.value)}
+              disabled={!!finalQr}
+              maxLength={120}
+              placeholder="Enter lot number"
+            />
           </div>
           <p className="text-sm text-muted-foreground">
             Use step 2 to complete the finished-goods checklist for this product type.
@@ -336,8 +562,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2 text-sm">{row.srNo}</td>
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -352,6 +582,7 @@ export function QcWorkflow() {
                               </td>
                             </tr>
                           ))}
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -405,8 +636,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2 text-sm" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -435,7 +670,9 @@ export function QcWorkflow() {
                               <td className="border p-2 text-sm">
                                 <b>{row.test}</b>
                               </td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
                               <td className="border p-2" />
                               <td className="border p-2 text-center">
                                 <input
@@ -454,7 +691,7 @@ export function QcWorkflow() {
 
                           <tr>
                             <td colSpan={5} className="border p-2">
-                              <b>(D) BIOLOGICAL TEST</b>
+                              <b>(C) BIOLOGICAL TEST</b>
                             </td>
                           </tr>
 
@@ -465,7 +702,9 @@ export function QcWorkflow() {
                               <td className="border p-2 text-sm">
                                 <b>{row.test}</b>
                               </td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
                               <td className="border p-2" />
                               <td className="border p-2 text-center">
                                 <input
@@ -481,6 +720,7 @@ export function QcWorkflow() {
                               </td>
                             </tr>
                           ))}
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -533,8 +773,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -562,8 +806,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -592,8 +840,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -611,8 +863,12 @@ export function QcWorkflow() {
                             <td className="border p-2 text-sm">
                               <b>Leakage</b>
                             </td>
-                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[15].specification}</td>
-                            <td className="border p-2 text-sm">{WVU_CHECKLIST_ROWS[15].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: WVU_CHECKLIST_ROWS[15], field: "specification" })}
+                            </td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: WVU_CHECKLIST_ROWS[15], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -626,6 +882,7 @@ export function QcWorkflow() {
                               />
                             </td>
                           </tr>
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -672,8 +929,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2 text-sm" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -688,6 +949,7 @@ export function QcWorkflow() {
                               </td>
                             </tr>
                           ))}
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -808,6 +1070,7 @@ export function QcWorkflow() {
                               />
                             </td>
                           </tr>
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -853,9 +1116,11 @@ export function QcWorkflow() {
                             </td>
                             <td className="border p-2 text-sm">
                               <div className="font-medium">Major Dome</div>
-                              <div className="text-muted-foreground">{OT_LIGHT_CHECKLIST_ROWS[0].specification}</div>
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[0], field: "specification" })}
                             </td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[0].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[0], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -870,9 +1135,11 @@ export function QcWorkflow() {
                             <td className="border p-2 text-sm" />
                             <td className="border p-2 text-sm">
                               <div className="font-medium">Minor Dome</div>
-                              <div className="text-muted-foreground">{OT_LIGHT_CHECKLIST_ROWS[1].specification}</div>
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[1], field: "specification" })}
                             </td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[1].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[1], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -887,8 +1154,12 @@ export function QcWorkflow() {
                           <tr>
                             <td className="border p-2 text-sm">2</td>
                             <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[2].test}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[2].specification}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[2].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[2], field: "specification" })}
+                            </td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[2], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -902,8 +1173,12 @@ export function QcWorkflow() {
                           <tr>
                             <td className="border p-2 text-sm">3</td>
                             <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[3].test}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[3].specification}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[3].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[3], field: "specification" })}
+                            </td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[3], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -917,8 +1192,12 @@ export function QcWorkflow() {
                           <tr>
                             <td className="border p-2 text-sm">4</td>
                             <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[4].test}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[4].specification}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[4].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[4], field: "specification" })}
+                            </td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[4], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -932,8 +1211,12 @@ export function QcWorkflow() {
                           <tr>
                             <td className="border p-2 text-sm">5</td>
                             <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[5].test}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[5].specification}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[5].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[5], field: "specification" })}
+                            </td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[5], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -947,8 +1230,12 @@ export function QcWorkflow() {
                           <tr>
                             <td className="border p-2 text-sm" />
                             <td className="border p-2 text-sm" />
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[6].specification}</td>
-                            <td className="border p-2 text-sm">{OT_LIGHT_CHECKLIST_ROWS[6].observation}</td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[6], field: "specification" })}
+                            </td>
+                            <td className="border p-2 text-sm">
+                              {renderEditableCell({ row: OT_LIGHT_CHECKLIST_ROWS[6], field: "observation" })}
+                            </td>
                             <td className="border p-2 text-center">
                               <input
                                 type="checkbox"
@@ -959,6 +1246,7 @@ export function QcWorkflow() {
                               />
                             </td>
                           </tr>
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -1010,8 +1298,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2 text-sm" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -1026,6 +1318,7 @@ export function QcWorkflow() {
                               </td>
                             </tr>
                           ))}
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -1068,8 +1361,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2 text-sm">{row.srNo}</td>
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -1084,6 +1381,7 @@ export function QcWorkflow() {
                               </td>
                             </tr>
                           ))}
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
@@ -1135,8 +1433,12 @@ export function QcWorkflow() {
                             <tr key={row.key}>
                               <td className="border p-2" />
                               <td className="border p-2 text-sm">{row.test}</td>
-                              <td className="border p-2 text-sm">{row.specification}</td>
-                              <td className="border p-2 text-sm">{row.observation}</td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "specification" })}
+                              </td>
+                              <td className="border p-2 text-sm">
+                                {renderEditableCell({ row: row, field: "observation" })}
+                              </td>
                               <td className="border p-2 text-center">
                                 <input
                                   type="checkbox"
@@ -1151,11 +1453,17 @@ export function QcWorkflow() {
                               </td>
                             </tr>
                           ))}
+                          {renderCustomRows()}
                         </tbody>
                       </table>
                     </div>
                   </div>
                 ) : null}
+                {hasChecklist && (
+                  <Button type="button" variant="outline" size="sm" onClick={addCustomRow}>
+                    Add row
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1257,7 +1565,10 @@ export function QcWorkflow() {
           <QrDisplay
             uid={finalQr.uid}
             qrDataUrl={finalQr.dataUrl}
-            detailRows={[{ label: "Product type", value: TYPE_LABEL[productType] }]}
+            detailRows={[
+              { label: "Product type", value: TYPE_LABEL[productType] },
+              { label: "Lot number", value: lotNumber.trim() },
+            ]}
           />
           <Button type="button" variant="secondary" onClick={resetSession}>
             New submission

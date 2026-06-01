@@ -25,6 +25,7 @@ export function buildQrLabelsPrintableHtmlGrid(args: {
   total: number;
   pageSize: QrPageSize;
   title?: string;
+  detailRows?: { label: string; value: string }[];
 }) {
   const total = Math.max(1, Math.min(args.total, 100));
   const pageSize = args.pageSize;
@@ -50,6 +51,13 @@ export function buildQrLabelsPrintableHtmlGrid(args: {
       .replaceAll("'", "&#039;");
 
   const title = escapeHtml(args.title ?? `QR Labels — ${args.total}`);
+  const detailRows = (args.detailRows ?? []).filter((row) => row.value.trim().length > 0);
+  const detailHtml = detailRows
+    .map(
+      (row) =>
+        `<div class="detail"><span>${escapeHtml(row.label)}:</span> ${escapeHtml(row.value)}</div>`,
+    )
+    .join("");
 
   const pageHtml = Array.from({ length: pages }, (_, pageIndex) => {
     const start = pageIndex * cellsPerPage;
@@ -68,6 +76,7 @@ export function buildQrLabelsPrintableHtmlGrid(args: {
         <div class="cell">
           <img class="qr" src="${args.qrDataUrl}" alt="QR ${label}" />
           <div class="serial">${escapeHtml(label)}</div>
+          ${detailHtml ? `<div class="details">${detailHtml}</div>` : ""}
         </div>
       `);
     }
@@ -133,6 +142,18 @@ export function buildQrLabelsPrintableHtmlGrid(args: {
         font-weight: 700;
         letter-spacing: 0.2px;
       }
+      .details {
+        margin-top: 1.5mm;
+        max-width: 100%;
+        font-family: Arial, sans-serif;
+        font-size: 7pt;
+        line-height: 1.2;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .detail span {
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -140,4 +161,3 @@ export function buildQrLabelsPrintableHtmlGrid(args: {
   </body>
 </html>`;
 }
-

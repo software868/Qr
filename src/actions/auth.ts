@@ -13,11 +13,6 @@ const registerSchema = z.object({
 });
 
 export async function registerFirstAdmin(formData: FormData) {
-  const adminCount = await prisma.user.count({ where: { role: UserRole.ADMIN } });
-  if (adminCount > 0) {
-    return { ok: false as const, error: "Registration is closed. An administrator already exists." };
-  }
-
   const parsed = registerSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -28,24 +23,33 @@ export async function registerFirstAdmin(formData: FormData) {
   }
 
   const { email, password, name } = parsed.data;
-  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) {
-    return { ok: false as const, error: "An account with this email already exists." };
+  try {
+    const adminCount = await prisma.user.count({ where: { role: UserRole.ADMIN } });
+    if (adminCount > 0) {
+      return { ok: false as const, error: "Registration is closed. An administrator already exists." };
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (existing) {
+      return { ok: false as const, error: "An account with this email already exists." };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase(),
+        passwordHash,
+        name,
+        role: UserRole.ADMIN,
+      },
+    });
+
+    await logAudit(user.id, "USER_REGISTER", "User", user.id, { role: "ADMIN" });
+
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "Registration is temporarily unavailable. Please check the database connection." };
   }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-  const user = await prisma.user.create({
-    data: {
-      email: email.toLowerCase(),
-      passwordHash,
-      name,
-      role: UserRole.ADMIN,
-    },
-  });
-
-  await logAudit(user.id, "USER_REGISTER", "User", user.id, { role: "ADMIN" });
-
-  return { ok: true as const };
 }
 
 const staffRegisterSchema = z.object({
@@ -68,24 +72,28 @@ export async function registerStaffPublic(formData: FormData, role: "QR_USER" | 
   }
 
   const { email, password, name, role: r } = parsed.data;
-  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) {
-    return { ok: false as const, error: "An account with this email already exists." };
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (existing) {
+      return { ok: false as const, error: "An account with this email already exists." };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase(),
+        passwordHash,
+        name,
+        role: r === "QR_USER" ? UserRole.QR_USER : UserRole.QC_USER,
+      },
+    });
+
+    await logAudit(undefined, "USER_REGISTER", "User", user.id, { role: r, source: "public" });
+
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "Registration is temporarily unavailable. Please check the database connection." };
   }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-  const user = await prisma.user.create({
-    data: {
-      email: email.toLowerCase(),
-      passwordHash,
-      name,
-      role: r === "QR_USER" ? UserRole.QR_USER : UserRole.QC_USER,
-    },
-  });
-
-  await logAudit(undefined, "USER_REGISTER", "User", user.id, { role: r, source: "public" });
-
-  return { ok: true as const };
 }
 
 export async function registerQrGeneratorUser(formData: FormData) {

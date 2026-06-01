@@ -27,6 +27,7 @@ type EntryRow = {
   id: string;
   entryUid: string;
   productType: string;
+  lotNumber: string;
   createdAt: string;
   performedBy: { name: string; email: string };
 };
@@ -192,6 +193,10 @@ export function AdminQcUtilSearch() {
                   {typeLabel(e.productType)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Lot: </span>
+                  {e.lotNumber || "-"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">Submitted: </span>
                   {formatWhen(e.createdAt)}
                 </p>
@@ -210,6 +215,7 @@ export function AdminQcUtilSearch() {
                 <TableRow>
                   <TableHead className="min-w-[140px]">Entry UID</TableHead>
                   <TableHead className="min-w-[120px]">Product type</TableHead>
+                  <TableHead className="min-w-[120px]">Lot number</TableHead>
                   <TableHead className="min-w-[160px]">Date</TableHead>
                   <TableHead className="min-w-[200px]">Submitted by</TableHead>
                 </TableRow>
@@ -231,6 +237,7 @@ export function AdminQcUtilSearch() {
                   >
                     <TableCell className="align-top font-mono text-xs">{e.entryUid}</TableCell>
                     <TableCell className="align-top text-sm">{typeLabel(e.productType)}</TableCell>
+                    <TableCell className="align-top text-sm">{e.lotNumber || "-"}</TableCell>
                     <TableCell className="align-top text-sm text-muted-foreground">
                       {formatWhen(e.createdAt)}
                     </TableCell>
@@ -255,6 +262,10 @@ export function AdminQcUtilSearch() {
                   <CardDescription>{typeLabel(e.productType)}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-1 text-xs text-muted-foreground">
+                  <p>
+                    <span className="text-muted-foreground">Lot </span>
+                    <span className="font-medium text-foreground">{e.lotNumber || "-"}</span>
+                  </p>
                   <p>{formatWhen(e.createdAt)}</p>
                   <p className="pt-1 text-foreground">
                     <span className="text-muted-foreground">By </span>

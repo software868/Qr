@@ -28,11 +28,23 @@ export default async function AdminQcUtilEntryPage({
     rawForm && typeof rawForm === "object" && !Array.isArray(rawForm)
       ? (rawForm as {
           passStatus?: string;
+          lotNumber?: string;
           inspectorNotes?: string;
           checklist?: Record<string, boolean>;
+          checklistRows?: {
+            key: string;
+            label?: string;
+            specification?: string;
+            observation?: string;
+            checked?: boolean;
+            custom?: boolean;
+          }[];
           bomChecks?: Record<string, boolean>;
         })
       : null;
+  if (formData && typeof formData.lotNumber !== "string") {
+    formData.lotNumber = "";
+  }
 
   const payload: AdminQcUtilEntryViewData = {
     entryUid: entry.entryUid,

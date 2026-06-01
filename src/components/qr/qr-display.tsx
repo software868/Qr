@@ -28,8 +28,9 @@ export function QrDisplay({ uid, qrDataUrl, detailRows }: Props) {
       total,
       pageSize,
       title: `QR Labels — ${uid}`,
+      detailRows: [{ label: "UID", value: uid }, ...detailRows],
     });
-  }, [qrDataUrl, total, pageSize, uid]);
+  }, [detailRows, qrDataUrl, total, pageSize, uid]);
 
   function printLabelsFormatted() {
     const w = window.open("", "_blank");

@@ -2,11 +2,13 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 
 const entryListSelect = {
   id: true,
   entryUid: true,
   productType: true,
+  formData: true,
   createdAt: true,
   performedBy: { select: { name: true, email: true } },
 } as const;
@@ -15,9 +17,16 @@ type EntryListRowRaw = {
   id: string;
   entryUid: string;
   productType: string;
+  formData: Prisma.JsonValue;
   createdAt: Date;
   performedBy: { name: string; email: string };
 };
+
+function lotNumberFromFormData(formData: Prisma.JsonValue): string {
+  if (!formData || typeof formData !== "object" || Array.isArray(formData)) return "";
+  const lotNumber = (formData as { lotNumber?: unknown }).lotNumber;
+  return typeof lotNumber === "string" ? lotNumber : "";
+}
 
 /** Server actions must return JSON-serializable data (no Date objects). */
 function serializeEntryListRows(rows: EntryListRowRaw[]) {
@@ -25,6 +34,7 @@ function serializeEntryListRows(rows: EntryListRowRaw[]) {
     id: e.id,
     entryUid: e.entryUid,
     productType: e.productType,
+    lotNumber: lotNumberFromFormData(e.formData),
     createdAt: e.createdAt.toISOString(),
     performedBy: e.performedBy,
   }));
@@ -57,15 +67,20 @@ export async function searchQcUtilEntriesAction(query: string) {
   }
 
   const entries = await prisma.qcUtilEntry.findMany({
-    where: {
-      OR: [{ entryUid: { contains: q, mode: "insensitive" } }],
-    },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: entryListSelect,
   });
 
-  return { ok: true as const, entries: serializeEntryListRows(entries) };
+  const normalizedQuery = q.toLowerCase();
+  const filtered = entries.filter((entry) => {
+    return (
+      entry.entryUid.toLowerCase().includes(normalizedQuery) ||
+      lotNumberFromFormData(entry.formData).toLowerCase().includes(normalizedQuery)
+    );
+  });
+
+  return { ok: true as const, entries: serializeEntryListRows(filtered) };
 }
 
 export async function getQcUtilEntryDetailAction(entryUid: string) {
@@ -104,14 +119,21 @@ export async function exportQcUtilEntriesCsvAction() {
     },
   });
 
-  const header = ["entryUid", "productType", "submittedByName", "submittedByEmail", "createdAt", "formJson"].join(
-    ",",
-  );
+  const header = [
+    "entryUid",
+    "productType",
+    "lotNumber",
+    "submittedByName",
+    "submittedByEmail",
+    "createdAt",
+    "formJson",
+  ].join(",");
 
   const rows = entries.map((e) =>
     [
       e.entryUid,
       e.productType,
+      escapeCsv(lotNumberFromFormData(e.formData)),
       escapeCsv(e.performedBy.name),
       escapeCsv(e.performedBy.email),
       e.createdAt.toISOString(),
